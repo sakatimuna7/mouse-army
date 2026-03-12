@@ -107,8 +107,8 @@ export class MainScene extends Phaser.Scene {
     this.setupMinimap();
 
     // 8. Join Game
-    const { playerName } = useGameStore.getState();
-    this.networkManager.emit('joinGame', { userName: playerName });
+    const { playerName, persistentId } = useGameStore.getState();
+    this.networkManager.emit('joinGame', { userName: playerName, persistentId });
 
     // 8. Cleanup on Shutdown
     this.events.once("shutdown", () => {
@@ -126,6 +126,7 @@ export class MainScene extends Phaser.Scene {
       this.networkManager.off("playerDeath");
       this.networkManager.off("playerRespawn");
       this.networkManager.off("playerDisconnected");
+      this.networkManager.off("killLog");
     });
   }
 
@@ -434,8 +435,12 @@ export class MainScene extends Phaser.Scene {
       if (victim) {
         this.createExplosion(victim.x, victim.y, 100);
         victim.setVisible(false);
-        if (userId === this.networkManager.getSocketId())
+        if (userId === this.networkManager.getSocketId()) {
           this.handleLocalDeath();
+          // Persistent session mapping is cleared on server upon death.
+          // If we want the player to return to lobby on death, we'd call:
+          // useGameStore.getState().setJoined(false);
+        }
       }
     });
 
@@ -453,6 +458,10 @@ export class MainScene extends Phaser.Scene {
         otherPlayer.destroy();
         this.otherPlayers.delete(userId);
       }
+    });
+
+    this.networkManager.on("killLog", (data: { killerName: string, victimName: string, timestamp: number }) => {
+      useGameStore.getState().addKillLog(data);
     });
   }
 
@@ -777,20 +786,18 @@ export class MainScene extends Phaser.Scene {
         } else {
             // Out of bounds: Draw pointer arrow at the edge
             const angle = Math.atan2(relY, relX);
-            const edgeX = Math.cos(angle) * (radius - 5);
-            const edgeY = Math.sin(angle) * (radius - 5);
             
-            this.minimapPointers.fillStyle(color, 1);
+            this.minimapPointers.fillStyle(color, 0.7); // Slightly transparent
             this.minimapPointers.beginPath();
             
-            // Draw a small triangle pointing outwards
-            const arrowSize = 6;
-            const p1x = Math.cos(angle) * radius;
-            const p1y = Math.sin(angle) * radius;
-            const p2x = Math.cos(angle - 0.3) * (radius - arrowSize);
-            const p2y = Math.sin(angle - 0.3) * (radius - arrowSize);
-            const p3x = Math.cos(angle + 0.3) * (radius - arrowSize);
-            const p3y = Math.sin(angle + 0.3) * (radius - arrowSize);
+            // Draw a sharper, smaller triangle pointing outwards
+            const arrowSize = 4;
+            const p1x = Math.cos(angle) * (radius - 2);
+            const p1y = Math.sin(angle) * (radius - 2);
+            const p2x = Math.cos(angle - 0.2) * (radius - 2 - arrowSize);
+            const p2y = Math.sin(angle - 0.2) * (radius - 2 - arrowSize);
+            const p3x = Math.cos(angle + 0.2) * (radius - 2 - arrowSize);
+            const p3y = Math.sin(angle + 0.2) * (radius - 2 - arrowSize);
             
             this.minimapPointers.fillPoints([
                 new Phaser.Geom.Point(p1x, p1y),

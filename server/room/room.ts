@@ -8,17 +8,17 @@ export class Room {
   private players: Set<string> = new Set();
   private readonly MAX_PLAYERS = 100;
 
-  constructor(roomId: string, io: Server) {
+  constructor(roomId: string, io: Server, onPlayerDeath?: (persistentId: string) => void) {
     this.roomId = roomId;
     this.io = io;
-    this.engine = new GameEngine(io, roomId);
+    this.engine = new GameEngine(io, roomId, onPlayerDeath);
   }
 
-  public addPlayer(socketId: string, userName: string): boolean {
-    if (this.isFull()) return false;
+  public addPlayer(socketId: string, userName: string, persistentId: string): boolean {
+    if (this.isFull() && !this.engine.getPlayerByPersistentId(persistentId)) return false;
     
     this.players.add(socketId);
-    this.engine.addPlayer(socketId, userName);
+    this.engine.addPlayer(socketId, userName, persistentId);
     return true;
   }
 

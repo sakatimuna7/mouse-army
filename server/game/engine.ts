@@ -12,6 +12,7 @@ interface IPlayerData extends IQuadEntity {
   isDead: boolean;
   isStunned: boolean;
   spawnTime: number;
+  persistentId: string;
 }
 
 interface IItemData extends IQuadEntity {
@@ -33,10 +34,12 @@ export class GameEngine {
   private readonly TICK_RATE = 20;
   private readonly TICK_MS = 1000 / 20;
   private readonly AOI_RADIUS = 600;
+  private onPlayerDeath?: (persistentId: string) => void;
 
-  constructor(io: Server, roomId: string) {
+  constructor(io: Server, roomId: string, onPlayerDeath?: (persistentId: string) => void) {
     this.io = io;
     this.roomId = roomId;
+    this.onPlayerDeath = onPlayerDeath;
     this.quadTree = new QuadTree({ x: 0, y: 0, width: this.WORLD_SIZE, height: this.WORLD_SIZE });
     this.startTickLoop();
     this.startItemSpawnLoop();
@@ -136,29 +139,58 @@ export class GameEngine {
     this.io.to(this.roomId).emit("leaderboardUpdate", leaderboard);
   }
 
-  addPlayer(socketId: string, userName: string) {
-    const newPlayer: IPlayerData = {
-      id: socketId,
-      userId: socketId,
-      userName: userName,
-      x: Math.random() * (this.WORLD_SIZE - 100) + 50,
-      y: Math.random() * (this.WORLD_SIZE - 100) + 50,
-      health: 100,
-      score: 0,
-      isDead: false,
-      isStunned: false,
-      spawnTime: Date.now()
-    };
-    this.players[socketId] = newPlayer;
+  public getPlayerByPersistentId(persistentId: string) {
+    return Object.values(this.players).find(p => p.persistentId === persistentId);
+  }
+
+  addPlayer(socketId: string, userName: string, persistentId: string) {
+    // Check if player already exists by persistentId
+    let existingPlayer = Object.values(this.players).find(p => p.persistentId === persistentId);
+
+    if (existingPlayer) {
+      // Reconnect: update userId (socketId) and inform everyone
+      delete this.players[existingPlayer.userId];
+      existingPlayer.userId = socketId;
+      existingPlayer.id = socketId;
+      this.players[socketId] = existingPlayer;
+      
+      console.log(`Player ${userName} reconnected with new socket ${socketId}`);
+    } else {
+      // New player
+      const newPlayer: IPlayerData = {
+        id: socketId,
+        userId: socketId,
+        userName: userName,
+        persistentId: persistentId,
+        x: Math.random() * (this.WORLD_SIZE - 100) + 50,
+        y: Math.random() * (this.WORLD_SIZE - 100) + 50,
+        health: 100,
+        score: 0,
+        isDead: false,
+        isStunned: false,
+        spawnTime: Date.now()
+      };
+      this.players[socketId] = newPlayer;
+    }
     
     const socket = this.io.sockets.sockets.get(socketId);
     if (socket) {
         // Initial sync
-        socket.emit("currentPlayers", this.players); // Keep original event for now
+        socket.emit("currentPlayers", this.players);
         socket.emit("currentItems", this.items);
-        this.io.to(this.roomId).emit("newPlayer", newPlayer);
+        this.io.to(this.roomId).emit("newPlayer", this.players[socketId]);
     }
     this.broadcastLeaderboard();
+  }
+
+  handleSocketDisconnect(socketId: string) {
+    // We don't remove the player immediately, just log it
+    // They will be removed if they die or if the room is cleared
+    const player = this.players[socketId];
+    if (player) {
+      console.log(`Player ${player.userName} disconnected (Socket: ${socketId})`);
+      this.io.to(this.roomId).emit("playerDisconnected", socketId);
+    }
   }
 
   removePlayer(socketId: string) {
@@ -237,6 +269,16 @@ export class GameEngine {
       victim.isDead = true;
       victim.health = 0;
       this.io.to(this.roomId).emit("playerDeath", data.victimId);
+      
+      this.io.to(this.roomId).emit("killLog", {
+        killerName: killer ? killer.userName : "Environment",
+        victimName: victim.userName,
+        timestamp: Date.now()
+      });
+      
+      if (this.onPlayerDeath) {
+        this.onPlayerDeath(victim.persistentId);
+      }
       
       if (killer) {
         killer.score += 10;

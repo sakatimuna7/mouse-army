@@ -20,11 +20,12 @@ const roomManager = new RoomManager(io);
 io.on("connection", (socket) => {
   console.log("A user connected:", socket.id);
 
-  socket.on("joinGame", (data: { userName: string }) => {
+  socket.on("joinGame", (data: { userName: string; persistentId?: string }) => {
     const userName = data.userName || `Guest-${socket.id.substring(0, 4)}`;
-    const room = roomManager.findOrCreateRoom(socket.id, userName);
+    const persistentId = data.persistentId || socket.id;
+    const room = roomManager.findOrCreateRoom(socket.id, userName, persistentId);
     socket.join(room.roomId);
-    console.log(`User ${socket.id} (${userName}) joined room ${room.roomId}`);
+    console.log(`User ${socket.id} (${userName}) [ID: ${persistentId}] joined room ${room.roomId}`);
 
     socket.on("playerMovement", (movementData: any) => {
       room.engine.movePlayer(socket.id, movementData);

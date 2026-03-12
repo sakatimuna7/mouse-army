@@ -5,45 +5,61 @@ import { v4 as uuidv4 } from "uuid";
 export class RoomManager {
   private io: Server;
   private rooms: Map<string, Room> = new Map();
-  private playerToRoom: Map<string, string> = new Map();
+  private socketToRoom: Map<string, string> = new Map();
+  private persistentToRoom: Map<string, string> = new Map();
 
   constructor(io: Server) {
     this.io = io;
   }
 
-  public findOrCreateRoom(socketId: string, userName: string): Room {
-    // Try to find an available room
-    let room = Array.from(this.rooms.values()).find(r => !r.isFull());
+  public findOrCreateRoom(socketId: string, userName: string, persistentId: string): Room {
+    // 1. Check if player already belongs to a room
+    let roomId = this.persistentToRoom.get(persistentId);
+    let room = roomId ? this.rooms.get(roomId) : undefined;
 
+    // 2. If no existing room or room is gone, find an available one
+    if (!room) {
+      room = Array.from(this.rooms.values()).find(r => !r.isFull());
+    }
+
+    // 3. If still no room, create one
     if (!room) {
       const roomId = `room-${uuidv4()}`;
-      room = new Room(roomId, this.io);
+      room = new Room(roomId, this.io, this.handlePlayerDeath.bind(this));
       this.rooms.set(roomId, room);
       console.log(`Created new room: ${roomId}`);
     }
 
-    room.addPlayer(socketId, userName);
-    this.playerToRoom.set(socketId, room.roomId);
+    room.addPlayer(socketId, userName, persistentId);
+    this.socketToRoom.set(socketId, room.roomId);
+    this.persistentToRoom.set(persistentId, room.roomId);
     return room;
   }
 
   public handleDisconnect(socketId: string) {
-    const roomId = this.playerToRoom.get(socketId);
+    const roomId = this.socketToRoom.get(socketId);
     if (roomId) {
       const room = this.rooms.get(roomId);
       if (room) {
-        room.removePlayer(socketId);
+        // We don't remove the player from the room immediately to allow reconnect
+        // Just inform the engine that this socket is gone
+        room.engine.handleSocketDisconnect(socketId);
+        
         if (room.isEmpty()) {
           this.rooms.delete(roomId);
           console.log(`Removed empty room: ${roomId}`);
         }
       }
-      this.playerToRoom.delete(socketId);
+      this.socketToRoom.delete(socketId);
     }
   }
 
+  public handlePlayerDeath(persistentId: string) {
+    this.persistentToRoom.delete(persistentId);
+  }
+
   public getRoomByPlayer(socketId: string): Room | undefined {
-    const roomId = this.playerToRoom.get(socketId);
+    const roomId = this.socketToRoom.get(socketId);
     return roomId ? this.rooms.get(roomId) : undefined;
   }
 }

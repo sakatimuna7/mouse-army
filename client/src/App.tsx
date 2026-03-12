@@ -3,6 +3,7 @@ import { phaserConfig, initGame } from "./game/game";
 import { Leaderboard } from "./components/parts/leaderboard/Leaderboard";
 import { Inventory } from "./components/parts/inventory/Inventory";
 import { Lobby } from "./components/parts/lobby/Lobby";
+import { KillFeed } from "./components/parts/kill-feed/KillFeed";
 import { useGameStore } from './store/useGameStore';
 
 function App() {
@@ -29,6 +30,7 @@ function App() {
   return (
     <div className="relative w-full h-screen bg-[#1a1a1a] overflow-hidden">
       <div id="game-container" className="w-full h-full flex items-center justify-center" />
+      <KillFeed />
       <Inventory />
       <Leaderboard />
     </div>
