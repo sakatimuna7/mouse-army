@@ -14,7 +14,10 @@ export const Leaderboard: React.FC = () => {
                         className={`leaderboard-item ${entry.isLocalPlayer ? 'local-player' : ''}`}
                     >
                         <span className="rank">#{index + 1}</span>
-                        <span className="username">{entry.userName || entry.userId.substring(0, 5)}</span>
+                        <span className="flex-1 font-bold text-white truncate">
+                            {entry.userName || `Guest-${entry.userId.substring(0, 5)}`}
+                            {entry.isLocalPlayer && <span className="ml-2 text-[10px] text-pink-500">(YOU)</span>}
+                        </span>
                         <span className="score">{entry.score} pts</span>
                     </div>
                 ))}

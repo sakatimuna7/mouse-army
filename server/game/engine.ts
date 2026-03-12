@@ -4,6 +4,7 @@ import { QuadTree, IQuadEntity, IRect } from "./quadtree.js";
 
 interface IPlayerData extends IQuadEntity {
   userId: string;
+  userName: string;
   x: number;
   y: number;
   health: number;
@@ -22,18 +23,20 @@ interface IItemData extends IQuadEntity {
 
 export class GameEngine {
   private io: Server;
+  private roomId: string;
   private players: Record<string, IPlayerData> = {};
   private items: Record<string, IItemData> = {};
   private quadTree: QuadTree<IQuadEntity>;
   
-  private readonly WORLD_SIZE = 2000;
+  private readonly WORLD_SIZE = 5000;
   private readonly MAX_ITEMS = 20;
   private readonly TICK_RATE = 20;
   private readonly TICK_MS = 1000 / 20;
   private readonly AOI_RADIUS = 600;
 
-  constructor(io: Server) {
+  constructor(io: Server, roomId: string) {
     this.io = io;
+    this.roomId = roomId;
     this.quadTree = new QuadTree({ x: 0, y: 0, width: this.WORLD_SIZE, height: this.WORLD_SIZE });
     this.startTickLoop();
     this.startItemSpawnLoop();
@@ -105,7 +108,7 @@ export class GameEngine {
         };
         newItem.itemId = newItem.id;
         this.items[newItem.id] = newItem;
-        this.io.emit("itemSpawned", newItem);
+        this.io.to(this.roomId).emit("itemSpawned", newItem);
       }
     }, 3000);
   }
@@ -127,15 +130,17 @@ export class GameEngine {
       .slice(0, 10)
       .map(p => ({
         userId: p.userId,
+        userName: p.userName,
         score: p.score
       }));
-    this.io.emit("leaderboardUpdate", leaderboard);
+    this.io.to(this.roomId).emit("leaderboardUpdate", leaderboard);
   }
 
-  addPlayer(socketId: string) {
+  addPlayer(socketId: string, userName: string) {
     const newPlayer: IPlayerData = {
       id: socketId,
       userId: socketId,
+      userName: userName,
       x: Math.random() * (this.WORLD_SIZE - 100) + 50,
       y: Math.random() * (this.WORLD_SIZE - 100) + 50,
       health: 100,
@@ -151,14 +156,14 @@ export class GameEngine {
         // Initial sync
         socket.emit("currentPlayers", this.players); // Keep original event for now
         socket.emit("currentItems", this.items);
-        this.io.emit("newPlayer", newPlayer);
+        this.io.to(this.roomId).emit("newPlayer", newPlayer);
     }
     this.broadcastLeaderboard();
   }
 
   removePlayer(socketId: string) {
     delete this.players[socketId];
-    this.io.emit("playerDisconnected", socketId);
+    this.io.to(this.roomId).emit("playerDisconnected", socketId);
     this.broadcastLeaderboard();
   }
 
@@ -198,7 +203,7 @@ export class GameEngine {
   }
 
   handleBomb(socketId: string, bombData: any) {
-    this.io.emit("bombSpawned", {
+    this.io.to(this.roomId).emit("bombSpawned", {
       bombId: uuidv4(),
       ownerId: socketId,
       ...bombData
@@ -209,7 +214,7 @@ export class GameEngine {
     const victim = this.players[data.victimId];
     if (victim) {
       victim.isStunned = true;
-      this.io.emit("playerHookedEffect", {
+      this.io.to(this.roomId).emit("playerHookedEffect", {
         victimId: data.victimId,
         attackerId: socketId,
         x: data.x,
@@ -231,7 +236,7 @@ export class GameEngine {
     if (victim && !victim.isDead) {
       victim.isDead = true;
       victim.health = 0;
-      this.io.emit("playerDeath", data.victimId);
+      this.io.to(this.roomId).emit("playerDeath", data.victimId);
       
       if (killer) {
         killer.score += 10;
@@ -245,7 +250,7 @@ export class GameEngine {
           victim.health = 100;
           victim.x = Math.random() * (this.WORLD_SIZE - 100) + 50;
           victim.y = Math.random() * (this.WORLD_SIZE - 100) + 50;
-          this.io.emit("playerRespawn", victim);
+          this.io.to(this.roomId).emit("playerRespawn", victim);
         }
       }, 3000);
     }
@@ -256,7 +261,7 @@ export class GameEngine {
     if (item) {
       const itemType = item.type;
       delete this.items[itemId];
-      this.io.emit("itemDestroyed", itemId);
+      this.io.to(this.roomId).emit("itemDestroyed", itemId);
       const socket = this.io.sockets.sockets.get(socketId);
       if (socket) {
         socket.emit("itemAddedToInventory", itemType);

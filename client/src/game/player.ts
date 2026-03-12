@@ -11,10 +11,12 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     public isStunned: boolean = false;
     private speedBoostTimer: number = 0;
 
-    // Health properties
+    // Health & Name properties
     public health: number = 100;
     public maxHealth: number = 100;
     private healthBar: Phaser.GameObjects.Graphics;
+    public userName: string;
+    private nameTag: Phaser.GameObjects.Text;
     
     // Score
     public score: number = 0;
@@ -29,9 +31,10 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     // Visual Effects
     private trailEmitter: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
 
-    constructor(scene: Phaser.Scene, id: string, x: number, y: number, texture: string) {
+    constructor(scene: Phaser.Scene, id: string, x: number, y: number, texture: string, userName: string) {
         super(scene, x, y, texture);
         this.playerId = id;
+        this.userName = userName;
 
         scene.add.existing(this);
         scene.physics.add.existing(this);
@@ -53,6 +56,16 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         // Initialize Health Bar
         this.healthBar = scene.add.graphics();
         this.healthBar.setDepth(3);
+        
+        // Initialize Name Tag
+        this.nameTag = scene.add.text(x, y - 40, this.userName, {
+            fontSize: '14px',
+            fontStyle: 'bold',
+            color: '#ffffff',
+            backgroundColor: 'rgba(0,0,0,0.4)',
+            padding: { x: 4, y: 2 }
+        }).setOrigin(0.5).setDepth(3);
+
         this.updateHealthBar();
 
         // Initialize Trail
@@ -134,8 +147,9 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
         this.setVelocity(newVx, newVy);
 
-        // 6. Update Health Bar Position
+        // 6. Update Health Bar & Name Tag Position
         this.updateHealthBar();
+        this.nameTag.setPosition(this.x, this.y - 40);
     }
 
     public updateHealthBar() {
@@ -255,6 +269,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
     public destroy(fromScene?: boolean) {
         this.healthBar.destroy();
+        this.nameTag.destroy();
         if (this.trailEmitter) this.trailEmitter.destroy();
         super.destroy(fromScene);
     }

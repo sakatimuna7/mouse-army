@@ -1,0 +1,41 @@
+import { Server } from "socket.io";
+import { GameEngine } from "../game/engine.js";
+
+export class Room {
+  public roomId: string;
+  public engine: GameEngine;
+  private io: Server;
+  private players: Set<string> = new Set();
+  private readonly MAX_PLAYERS = 100;
+
+  constructor(roomId: string, io: Server) {
+    this.roomId = roomId;
+    this.io = io;
+    this.engine = new GameEngine(io, roomId);
+  }
+
+  public addPlayer(socketId: string, userName: string): boolean {
+    if (this.isFull()) return false;
+    
+    this.players.add(socketId);
+    this.engine.addPlayer(socketId, userName);
+    return true;
+  }
+
+  public removePlayer(socketId: string) {
+    this.players.delete(socketId);
+    this.engine.removePlayer(socketId);
+  }
+
+  public isFull(): boolean {
+    return this.players.size >= this.MAX_PLAYERS;
+  }
+
+  public getPlayerCount(): number {
+    return this.players.size;
+  }
+
+  public isEmpty(): boolean {
+    return this.players.size === 0;
+  }
+}

@@ -28,9 +28,12 @@ export class MainScene extends Phaser.Scene {
   > = new Map();
   private bombs: Phaser.Physics.Arcade.Group | null = null;
   private networkManager!: NetworkManager;
+  private minimapGraphics!: Phaser.GameObjects.Graphics;
+  private minimapPointers!: Phaser.GameObjects.Graphics;
+  private minimapContainer!: Phaser.GameObjects.Container;
 
   // World & Config
-  private readonly WORLD_SIZE = 2000;
+  private readonly WORLD_SIZE = 5000;
   private readonly GRID_SIZE = 50;
   private lastEmitTime: number = 0;
   private emitInterval: number = 50;
@@ -99,6 +102,31 @@ export class MainScene extends Phaser.Scene {
 
     // 6. Setup Listeners
     this.setupNetworkListeners();
+
+    // 7. Setup Minimap
+    this.setupMinimap();
+
+    // 8. Join Game
+    const { playerName } = useGameStore.getState();
+    this.networkManager.emit('joinGame', { userName: playerName });
+
+    // 8. Cleanup on Shutdown
+    this.events.once("shutdown", () => {
+      this.networkManager.off("leaderboardUpdate");
+      this.networkManager.off("currentPlayers");
+      this.networkManager.off("newPlayer");
+      this.networkManager.off("currentItems");
+      this.networkManager.off("itemSpawned");
+      this.networkManager.off("itemDestroyed");
+      this.networkManager.off("itemAddedToInventory");
+      this.networkManager.off("bombSpawned");
+      this.networkManager.off("playerMoved");
+      this.networkManager.off("playerAttack");
+      this.networkManager.off("playerHookedEffect");
+      this.networkManager.off("playerDeath");
+      this.networkManager.off("playerRespawn");
+      this.networkManager.off("playerDisconnected");
+    });
   }
 
   private generateVectorTextures() {
@@ -123,7 +151,7 @@ export class MainScene extends Phaser.Scene {
 
   private drawNeonCursor(key: string, color: number) {
     const size = 64;
-    const g = this.make.graphics({ x: 0, y: 0, add: false });
+    const g = this.make.graphics({ x: 0, y: 0 });
     
     // Outer Glow
     g.lineStyle(6, color, 0.3);
@@ -153,7 +181,7 @@ export class MainScene extends Phaser.Scene {
 
   private drawItemIcon(key: string, emoji: string, color: number) {
     const size = 64;
-    const g = this.make.graphics({ x: 0, y: 0, add: false });
+    const g = this.make.graphics({ x: 0, y: 0 });
     
     // Inventory-style rounded block
     g.fillStyle(0x0f0f0f, 0.9);
@@ -168,8 +196,7 @@ export class MainScene extends Phaser.Scene {
     const txt = this.make.text({
         x: size/2, y: size/2,
         text: emoji,
-        style: { fontSize: '32px' },
-        add: false
+        style: { fontSize: '32px' }
     }).setOrigin(0.5);
 
     const rt = this.add.renderTexture(0, 0, size, size);
@@ -184,7 +211,7 @@ export class MainScene extends Phaser.Scene {
 
   private drawPhysicalBomb() {
       const size = 32;
-      const g = this.make.graphics({ x: 0, y: 0, add: false });
+      const g = this.make.graphics({ x: 0, y: 0 });
       
       // Core
       g.fillStyle(0x111111, 1);
@@ -483,7 +510,7 @@ export class MainScene extends Phaser.Scene {
     damage: number,
     attackerId: string,
   ) {
-    if (this.player && this.player.visible && attackerId !== this.networkManager.getSocketId()) {
+    if (this.player && this.player.visible) {
       const dist = Phaser.Math.Distance.Between(
         this.player.x,
         this.player.y,
@@ -639,6 +666,7 @@ export class MainScene extends Phaser.Scene {
       playerInfo.x,
       playerInfo.y,
       "mouse_pink",
+      playerInfo.userName || 'You'
     );
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
   }
@@ -670,6 +698,7 @@ export class MainScene extends Phaser.Scene {
       playerInfo.x,
       playerInfo.y,
       "mouse_azure",
+      playerInfo.userName || 'Player'
     );
     this.otherPlayers.set(playerInfo.userId, otherPlayer);
   }
@@ -681,6 +710,110 @@ export class MainScene extends Phaser.Scene {
         this.networkManager.emit("playerMovement", this.player.getEntityData());
         this.lastEmitTime = time;
       }
+    }
+    
+    this.updateMinimap();
+  }
+
+  private setupMinimap() {
+    const size = 150;
+    const padding = 20;
+    
+    this.minimapContainer = this.add.container(padding + size/2, padding + size/2);
+    this.minimapContainer.setScrollFactor(0);
+    this.minimapContainer.setDepth(100);
+
+    // Background circle
+    const bg = this.add.graphics();
+    bg.fillStyle(0x000000, 0.6);
+    bg.lineStyle(2, 0xffffff, 0.3);
+    bg.fillCircle(0, 0, size/2);
+    bg.strokeCircle(0, 0, size/2);
+    this.minimapContainer.add(bg);
+
+    // Mask for items/players
+    this.minimapGraphics = this.add.graphics();
+    this.minimapPointers = this.add.graphics(); // This one sits outside the mask
+    this.minimapContainer.add([this.minimapGraphics, this.minimapPointers]);
+
+    const maskMask = this.make.graphics({ x: 0, y: 0 });
+    maskMask.fillStyle(0xffffff, 1);
+    maskMask.fillCircle(padding + size/2, padding + size/2, size/2);
+    maskMask.setScrollFactor(0);
+    
+    const geomMask = maskMask.createGeometryMask();
+    this.minimapGraphics.setMask(geomMask);
+    this.minimapGraphics.setDepth(1); // Ensure it's above the background
+
+    // Compass
+    const compassStyle = { fontSize: '12px', fontStyle: 'bold', color: '#ffffff' };
+    const n = this.add.text(0, -size/2 + 10, 'N', compassStyle).setOrigin(0.5);
+    const s = this.add.text(0, size/2 - 10, 'S', compassStyle).setOrigin(0.5);
+    const e = this.add.text(size/2 - 10, 0, 'E', compassStyle).setOrigin(0.5);
+    const w = this.add.text(-size/2 + 10, 0, 'W', compassStyle).setOrigin(0.5);
+    this.minimapContainer.add([n, s, e, w]);
+  }
+
+  private updateMinimap() {
+    if (!this.minimapGraphics || !this.minimapPointers) return;
+    this.minimapGraphics.clear();
+    this.minimapPointers.clear();
+    const size = 150;
+    const radius = size / 2;
+    const scale = size / this.WORLD_SIZE;
+
+    const drawIndicator = (worldX: number, worldY: number, color: number, dotSize: number, isLocal: boolean = false) => {
+        const relX = (worldX * scale) - radius;
+        const relY = (worldY * scale) - radius;
+        const dist = Math.sqrt(relX * relX + relY * relY);
+
+        if (dist <= radius) {
+            this.minimapGraphics.fillStyle(color, isLocal ? 1 : 0.8);
+            this.minimapGraphics.fillCircle(relX, relY, dotSize);
+            if (isLocal) {
+                this.minimapGraphics.lineStyle(1, 0xffffff, 1);
+                this.minimapGraphics.strokeCircle(relX, relY, dotSize + 1);
+            }
+        } else {
+            // Out of bounds: Draw pointer arrow at the edge
+            const angle = Math.atan2(relY, relX);
+            const edgeX = Math.cos(angle) * (radius - 5);
+            const edgeY = Math.sin(angle) * (radius - 5);
+            
+            this.minimapPointers.fillStyle(color, 1);
+            this.minimapPointers.beginPath();
+            
+            // Draw a small triangle pointing outwards
+            const arrowSize = 6;
+            const p1x = Math.cos(angle) * radius;
+            const p1y = Math.sin(angle) * radius;
+            const p2x = Math.cos(angle - 0.3) * (radius - arrowSize);
+            const p2y = Math.sin(angle - 0.3) * (radius - arrowSize);
+            const p3x = Math.cos(angle + 0.3) * (radius - arrowSize);
+            const p3y = Math.sin(angle + 0.3) * (radius - arrowSize);
+            
+            this.minimapPointers.fillPoints([
+                new Phaser.Geom.Point(p1x, p1y),
+                new Phaser.Geom.Point(p2x, p2y),
+                new Phaser.Geom.Point(p3x, p3y)
+            ]);
+        }
+    };
+
+    // Items
+    this.items.forEach((sprite) => {
+        drawIndicator(sprite.x, sprite.y, 0xffff00, 2);
+    });
+
+    // Other Players
+    this.otherPlayers.forEach(other => {
+        if (!other.visible) return;
+        drawIndicator(other.x, other.y, 0x00ffff, 2);
+    });
+
+    // Local Player
+    if (this.player) {
+        drawIndicator(this.player.x, this.player.y, 0xff00ff, 3, true);
     }
   }
 }

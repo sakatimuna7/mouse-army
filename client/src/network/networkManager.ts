@@ -26,6 +26,10 @@ export class NetworkManager {
         this.socket.on(event, callback);
     }
 
+    public off(event: string, callback?: (data: any) => void) {
+        this.socket.off(event, callback);
+    }
+
     public emit(event: string, data: any) {
         this.socket.emit(event, data);
     }
