@@ -18,11 +18,25 @@ const TurboIndicator: React.FC = () => {
     );
 };
 
+const HookIndicator: React.FC = () => {
+    const { hookCount } = useGameStore();
+    return (
+        <div className="hook-wrap">
+            <span className="hook-label">HOOK [E]</span>
+            <div className="hook-charges">
+                <div className={`hook-charge ${hookCount > 0 ? 'active' : ''}`}>
+                    🪝
+                </div>
+            </div>
+        </div>
+    );
+};
+
 export const Inventory: React.FC = () => {
     const { inventory } = useGameStore();
 
     // Filter to only show relevant items as per requirement
-    const displayItems = inventory.filter(item => item === 'bomb' || item === 'hook');
+    const displayItems = inventory.filter(item => item === 'bomb');
 
     return (
         <div className="inventory-outer">
@@ -43,6 +57,9 @@ export const Inventory: React.FC = () => {
 
             {/* Turbo Stack Indicator */}
             <TurboIndicator />
+
+            {/* Hook Indicator */}
+            <HookIndicator />
 
             <style>{`
                 .inventory-outer {
@@ -141,6 +158,52 @@ export const Inventory: React.FC = () => {
                     background: #ffff00;
                     box-shadow: 0 0 15px #ffff00, inset 0 0 8px rgba(255,255,255,0.8);
                     transform: scale(1.1);
+                }
+
+                .hook-wrap {
+                    position: absolute;
+                    left: calc(100% + 85px);
+                    bottom: 0;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    gap: 6px;
+                }
+
+                .hook-label {
+                    color: rgba(136, 136, 255, 0.7);
+                    font-size: 9px;
+                    font-weight: 900;
+                    letter-spacing: 1px;
+                    text-shadow: 0 0 10px rgba(136, 136, 255, 0.3);
+                }
+
+                .hook-charges {
+                    background: rgba(0, 0, 0, 0.4);
+                    padding: 6px;
+                    border-radius: 8px;
+                    border: 1px solid rgba(136, 136, 255, 0.2);
+                }
+
+                .hook-charge {
+                    width: 32px;
+                    height: 32px;
+                    background: rgba(255, 255, 255, 0.05);
+                    border-radius: 6px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 1.2rem;
+                    transition: all 0.3s ease;
+                    opacity: 0.3;
+                }
+
+                .hook-charge.active {
+                    background: rgba(136, 136, 255, 0.2);
+                    border: 1px solid #8888ff;
+                    opacity: 1;
+                    box-shadow: 0 0 15px rgba(136, 136, 255, 0.4);
+                    transform: scale(1.05);
                 }
             `}</style>
         </div>

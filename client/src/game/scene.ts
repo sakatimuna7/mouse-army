@@ -31,6 +31,7 @@ export class MainScene extends Phaser.Scene {
   private minimapGraphics!: Phaser.GameObjects.Graphics;
   private minimapPointers!: Phaser.GameObjects.Graphics;
   private minimapContainer!: Phaser.GameObjects.Container;
+  private hookRangeGraphics!: Phaser.GameObjects.Graphics;
 
   // World & Config
   private readonly WORLD_SIZE = 5000;
@@ -46,7 +47,7 @@ export class MainScene extends Phaser.Scene {
   private readonly BOMB_EXPLOSION_RADIUS = 250;
   private readonly BOMB_EXPLOSION_FORCE = 1500;
   private readonly BOMB_DAMAGE = 60;
-  private readonly HOOK_RANGE = 450;
+  private readonly HOOK_RANGE = 160;
   private readonly STUN_DURATION = 1500;
   private lastTurboTime: number = 0;
   private readonly TURBO_COOLDOWN = 1200;
@@ -67,6 +68,8 @@ export class MainScene extends Phaser.Scene {
   create() {
     this.networkManager = NetworkManager.getInstance();
     this.bombs = this.physics.add.group();
+    this.hookRangeGraphics = this.add.graphics();
+    this.hookRangeGraphics.setDepth(1);
 
     // 1. Generate ALL asset textures in-engine for perfect transparency
     this.generateVectorTextures();
@@ -259,10 +262,25 @@ export class MainScene extends Phaser.Scene {
       if (
         this.player &&
         this.player.visible &&
-        !this.player.isStunned &&
-        this.player.hasItem("hook")
+        !this.player.isStunned
       ) {
-        this.useHook();
+         const { hookCount } = useGameStore.getState();
+         if (hookCount > 0) {
+            if (!this.player.isAimingHook) {
+                // Stage 1: Aiming
+                // 1. Block if Turbo is active
+                if (this.player.isSpeedBoostActive()) {
+                    this.showFloatingText(this.player.x, this.player.y - 40, "BLOCK BY TURBO!", 0xff4444);
+                    return;
+                }
+                this.player.setAimingHook(true, this.time.now);
+                this.showFloatingText(this.player.x, this.player.y - 40, "HOOK READY", 0x8888ff);
+            } else {
+                // Stage 2: Fire
+                this.useHook();
+                this.player.setAimingHook(false);
+            }
+         }
       }
     });
 
@@ -339,6 +357,17 @@ export class MainScene extends Phaser.Scene {
                 0xffaa00,
             );
           }
+        } else if (type === "hook") {
+             const { hookCount, setHookCount } = useGameStore.getState();
+             if (hookCount < 1) {
+                setHookCount(1);
+                this.showFloatingText(
+                    this.player.x,
+                    this.player.y - 40,
+                    "HOOK ACQUIRED",
+                    0x8888ff,
+                );
+             }
         } else {
           this.player.addToInventory(type);
           this.showFloatingText(
@@ -484,6 +513,9 @@ export class MainScene extends Phaser.Scene {
   }
 
   private useHook() {
+    const { hookCount, setHookCount } = useGameStore.getState();
+    if (hookCount <= 0) return;
+
     const pointer = this.input.activePointer;
     const worldPointer = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
     let targetPlayer: Player | null = null;
@@ -518,7 +550,9 @@ export class MainScene extends Phaser.Scene {
       }
     });
 
-    this.player.removeItem("hook");
+    setHookCount(0);
+    this.player.setAimingHook(false);
+
     if (targetPlayer) {
       this.networkManager.emit("playerHooked", {
         victimId: (targetPlayer as Player).playerId,
@@ -660,6 +694,12 @@ export class MainScene extends Phaser.Scene {
         this.showFloatingText(this.player.x, this.player.y - 40, "TURBO ACTIVE!", 0xffff00);
         return;
     }
+
+    // BLOCK BY HOOK
+    if (this.player.isAimingHook) {
+        this.showFloatingText(this.player.x, this.player.y - 40, "BLOCK BY HOOK!", 0xff4444);
+        return;
+    }
     
     const { turboCount, setTurboCount } = useGameStore.getState();
     const now = this.time.now;
@@ -703,6 +743,19 @@ export class MainScene extends Phaser.Scene {
       duration: 400,
       onComplete: () => circle.destroy(),
     });
+  }
+
+  private drawHookRange() {
+    this.hookRangeGraphics.clear();
+    if (this.player && this.player.visible && this.player.isAimingHook) {
+      this.hookRangeGraphics.lineStyle(2, 0x8888ff, 0.3);
+      this.hookRangeGraphics.strokeCircle(this.player.x, this.player.y, this.HOOK_RANGE);
+      
+      // Pulse effect
+      const pulse = (Math.sin(this.time.now / 200) + 1) * 0.1;
+      this.hookRangeGraphics.fillStyle(0x8888ff, 0.05 + pulse);
+      this.hookRangeGraphics.fillCircle(this.player.x, this.player.y, this.HOOK_RANGE);
+    }
   }
 
   private showFloatingText(x: number, y: number, text: string, color: number) {
@@ -773,6 +826,15 @@ export class MainScene extends Phaser.Scene {
       if (time - this.lastEmitTime > this.emitInterval) {
         this.networkManager.emit("playerMovement", this.player.getEntityData());
         this.lastEmitTime = time;
+      }
+      this.drawHookRange();
+
+      // Check Hook Timeout
+      if (this.player.isAimingHook && this.time.now - this.player.hookAimStartTime > 1500) {
+          const { setHookCount } = useGameStore.getState();
+          setHookCount(0);
+          this.player.setAimingHook(false);
+          this.showFloatingText(this.player.x, this.player.y - 40, "HOOK FAILED!", 0xff4444);
       }
     }
     

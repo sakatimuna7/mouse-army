@@ -22,11 +22,13 @@ interface IGameStore {
     persistentId: string;
     killLogs: IKillLog[];
     turboCount: number;
+    hookCount: number;
     setLeaderboard: (data: ILeaderboardEntry[]) => void;
     setInventory: (items: string[]) => void;
     setPlayerName: (name: string) => void;
     setJoined: (status: boolean) => void;
     setTurboCount: (count: number) => void;
+    setHookCount: (count: number) => void;
     addKillLog: (log: Omit<IKillLog, 'id'>) => void;
 }
 
@@ -47,6 +49,7 @@ export const useGameStore = create<IGameStore>((set) => ({
     persistentId: getPersistentId(),
     killLogs: [],
     turboCount: 0,
+    hookCount: 0,
     setLeaderboard: (data) => set({ leaderboard: data }),
     setInventory: (items) => set({ inventory: items }),
     setPlayerName: (name) => {
@@ -58,6 +61,7 @@ export const useGameStore = create<IGameStore>((set) => ({
         set({ isJoined: status });
     },
     setTurboCount: (count) => set({ turboCount: count }),
+    setHookCount: (count) => set({ hookCount: count }),
     addKillLog: (log) => set((state) => ({ 
         killLogs: [...state.killLogs, { ...log, id: Math.random().toString(36).substring(7) }].slice(-5) 
     })),

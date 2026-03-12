@@ -10,6 +10,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     // States
     public isStunned: boolean = false;
     private speedBoostTimer: number = 0;
+    public isAimingHook: boolean = false;
+    public hookAimStartTime: number = 0;
 
     // Health & Name properties
     public health: number = 100;
@@ -125,6 +127,12 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
             targetVx = (dx / distance) * this.currentMaxSpeed;
             targetVy = (dy / distance) * this.currentMaxSpeed;
+
+            // Apply Hook Aiming Slow (2.5%)
+            if (this.isAimingHook) {
+                targetVx *= 0.975;
+                targetVy *= 0.975;
+            }
         } else {
             targetVx = 0;
             targetVy = 0;
@@ -197,6 +205,18 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         }
     }
 
+    public setAimingHook(aiming: boolean, startTime: number = 0) {
+        this.isAimingHook = aiming;
+        this.hookAimStartTime = aiming ? startTime : 0;
+        if (aiming) {
+            this.setTint(0x8888ff); // Bluish tint for aiming
+        } else {
+            if (!this.isStunned && this.speedBoostTimer <= 0) {
+                this.clearTint();
+            }
+        }
+    }
+
     public takeDamage(amount: number) {
         this.health -= amount;
         if (this.health < 0) this.health = 0;
@@ -232,9 +252,14 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
             // Show feedback that inventory is full
             return;
         }
-        if (itemType === 'bomb' || itemType === 'hook') {
+        if (itemType === 'bomb') {
             this.inventory.push(itemType);
             this.syncInventoryToStore();
+        } else if (itemType === 'hook') {
+            const { hookCount, setHookCount } = useGameStore.getState();
+            if (hookCount < 1) {
+                setHookCount(1);
+            }
         }
     }
 
