@@ -384,22 +384,54 @@ export class MainScene extends Phaser.Scene {
       this.createBombEntity(bombData);
     });
 
-    this.networkManager.on("playerMoved", (playerInfo: any) => {
-      const otherPlayer = this.otherPlayers.get(playerInfo.userId);
-      if (otherPlayer) {
-        otherPlayer.health = playerInfo.health;
-        if (otherPlayer.isStunned !== playerInfo.isStunned) {
-          otherPlayer.setStun(playerInfo.isStunned);
+    this.networkManager.on("gameUpdate", (data: { players: Record<string, any>, items: Record<string, any> }) => {
+      // 1. Sync Players
+      Object.entries(data.players).forEach(([id, info]) => {
+        if (id === this.networkManager.getSocketId()) {
+          // Sync local player if needed (usually client is authoritative for own movement)
+          return;
         }
-        otherPlayer.updateHealthBar();
+
+        let other = this.otherPlayers.get(id);
+        if (!other) {
+          // Spawn if not exists
+          other = new Player(this, id, info.x, info.y, "player_atlas", info.userName);
+          this.otherPlayers.set(id, other);
+        }
+
+        // Update properties
+        other.health = info.health;
+        other.isBot = !!info.isBot;
+        other.isDead = !!info.isDead;
+
+        if (other.isDead) {
+            other.setVisible(false);
+        } else {
+            other.setVisible(true);
+            if (other.isBot) {
+                other.setTint(0xcccccc);
+            } else {
+                other.clearTint(); // Clear tint if not a bot
+            }
+        }
+        
+        // Simple interpolation
         this.tweens.add({
-          targets: otherPlayer,
-          x: playerInfo.x,
-          y: playerInfo.y,
-          duration: this.emitInterval * 0.7,
+          targets: other,
+          x: info.x,
+          y: info.y,
+          duration: 50, // Match server tick rate (20Hz = 50ms)
           ease: "Linear",
+          overwrite: true
         });
-      }
+      });
+
+      // 2. Sync Items
+      Object.entries(data.items).forEach(([id, info]) => {
+        if (!this.items.has(id)) {
+           this.addItem(info as IItemData);
+        }
+      });
     });
 
     this.networkManager.on(
@@ -419,6 +451,7 @@ export class MainScene extends Phaser.Scene {
           data.force,
           this.ATTACK_DAMAGE,
           data.attackerId,
+          false // canHitOwner = false (Basic attack doesn't hit self)
         );
       },
     );
@@ -549,56 +582,100 @@ export class MainScene extends Phaser.Scene {
         }
       }
     });
+      setHookCount(0);
+      this.player.setAimingHook(false);
 
-    setHookCount(0);
-    this.player.setAimingHook(false);
-
-    if (targetPlayer) {
-      this.networkManager.emit("playerHooked", {
-        victimId: (targetPlayer as Player).playerId,
-        attackerId: this.networkManager.getSocketId(),
-        x: this.player.x,
-        y: this.player.y,
-      });
-    }
+      if (targetPlayer) {
+        this.networkManager.emit("playerHooked", {
+          victimId: (targetPlayer as Player).playerId,
+          attackerId: this.networkManager.getSocketId(),
+          x: this.player.x,
+          y: this.player.y,
+        });
+        console.log(`Sending playerHooked for victim: ${(targetPlayer as Player).playerId}`);
+      }
   }
 
-  private handleExplosionDamage(
+  handleExplosionDamage(
     x: number,
     y: number,
     radius: number,
     force: number,
     damage: number,
     attackerId: string,
+    canHitOwner: boolean = true,
+    shouldReport: boolean = false
   ) {
-    if (this.player && this.player.visible) {
-      const dist = Phaser.Math.Distance.Between(
-        this.player.x,
-        this.player.y,
-        x,
-        y,
-      );
-      if (dist < radius) {
-        const angle = Phaser.Math.Angle.Between(
-          x,
-          y,
-          this.player.x,
-          this.player.y,
-        );
-        const forceScale = 1 - dist / radius;
-        this.player.applyKnockback(
-          Math.cos(angle) * force * forceScale,
-          Math.sin(angle) * force * forceScale,
-        );
-        const finalDamage = Math.floor(damage * forceScale);
-        this.player.takeDamage(finalDamage);
-        if (this.player.health <= 0) {
-          this.networkManager.emit("playerKilled", {
-            victimId: this.networkManager.getSocketId(),
-            killerId: attackerId,
-          });
+    const myId = this.networkManager.getSocketId();
+    if (!myId) return;
+
+    // 1. Check Local Player
+    if (this.player && this.player.visible && !this.player.isDead) {
+      const isOwner = attackerId === myId;
+      if (!isOwner || canHitOwner) {
+        const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, x, y);
+        if (dist < radius) {
+          const angle = Phaser.Math.Angle.Between(x, y, this.player.x, this.player.y);
+          const forceScale = 1 - dist / radius;
+          this.player.applyKnockback(Math.cos(angle) * force * forceScale, Math.sin(angle) * force * forceScale);
+          const finalDamage = Math.floor(damage * forceScale);
+          this.player.takeDamage(finalDamage);
+          
+          if (this.player.health <= 0) {
+            this.networkManager.emit("playerKilled", {
+              victimId: this.networkManager.getSocketId(),
+              killerId: attackerId,
+            });
+          }
         }
       }
+    }
+
+    // 2. Check Other Players (especially Bots)
+    // Who reports damage to bots from non-player sources?
+    const isOwner = attackerId === myId;
+    
+    // Identify humans in the room
+    const humanIds = [myId];
+    this.otherPlayers.forEach((p, id) => {
+        if (!p.isBot) humanIds.push(id);
+    });
+    humanIds.sort();
+    const amIDelegate = humanIds[0] === myId;
+
+    // Determine if the attacker is a known human player
+    const attackerIsHuman = humanIds.includes(attackerId);
+    
+    // Reporting Logic: 
+    // - If it's your own attack, you report for everyone you hit.
+    // - If it's a bot's attack (or env), ONLY the 'delegate' (first human) reports for all bots hit.
+    const shouldIReportForOthers = attackerIsHuman ? isOwner : amIDelegate;
+
+    if (shouldIReportForOthers) {
+        this.otherPlayers.forEach(other => {
+            if (other.visible && !other.isDead) {
+                const dist = Phaser.Math.Distance.Between(other.x, other.y, x, y);
+                if (dist < radius) {
+                    const forceScale = 1 - dist / radius;
+                    const finalDamage = Math.floor(damage * forceScale);
+                    
+                    // Predict damage on client
+                    other.takeDamage(finalDamage);
+                    
+                    // Report to server (especially for Bots)
+                    if (shouldReport) {
+                        this.networkManager.emit("playerAttack", {
+                            x: x,
+                            y: y,
+                            radius: radius,
+                            force: force
+                        });
+                        // Only report once per explosion
+                        shouldReport = false; 
+                    }
+                }
+            }
+        });
     }
   }
 
@@ -663,7 +740,9 @@ export class MainScene extends Phaser.Scene {
             this.handleExplosionDamage(
                 bombSprite.x, bombSprite.y,
                 this.BOMB_EXPLOSION_RADIUS, this.BOMB_EXPLOSION_FORCE,
-                this.BOMB_DAMAGE, data.ownerId
+                this.BOMB_DAMAGE, data.ownerId,
+                true, // canHitOwner
+                true  // shouldReport = true (Bombs need client report)
             );
             this.createExplosion(bombSprite.x, bombSprite.y, this.BOMB_EXPLOSION_RADIUS);
             bombSprite.destroy();
@@ -684,6 +763,17 @@ export class MainScene extends Phaser.Scene {
       radius: this.ATTACK_RADIUS,
       force: this.ATTACK_FORCE,
     });
+
+    // LOCAL PREDICTION: Immediately check for hits (especially for bots)
+    this.handleExplosionDamage(
+        this.player.x,
+        this.player.y,
+        this.ATTACK_RADIUS,
+        this.ATTACK_FORCE,
+        this.ATTACK_DAMAGE,
+        this.networkManager.getSocketId() || 'local',
+        false // canHitOwner = false (Basic attack doesn't hit self)
+    );
   }
 
   private useTurbo() {
@@ -838,6 +928,11 @@ export class MainScene extends Phaser.Scene {
       }
     }
     
+    // Sync UI for all other players (important for bots and those moved by tweens)
+    this.otherPlayers.forEach(other => {
+        other.syncUI();
+    });
+
     this.updateMinimap();
   }
 

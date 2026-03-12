@@ -41,13 +41,22 @@ export class RoomManager {
     if (roomId) {
       const room = this.rooms.get(roomId);
       if (room) {
-        // We don't remove the player from the room immediately to allow reconnect
         // Just inform the engine that this socket is gone
         room.engine.handleSocketDisconnect(socketId);
         
-        if (room.isEmpty()) {
+        // Shut down the room if no more human players are active
+        if (!room.engine.hasActiveHumans()) {
+          room.engine.stop();
           this.rooms.delete(roomId);
-          console.log(`Removed empty room: ${roomId}`);
+          console.log(`Shut down empty room: ${roomId}`);
+          
+          // Clean up all character mappings associated with this room
+          for (const [sId, rId] of this.socketToRoom.entries()) {
+            if (rId === roomId) this.socketToRoom.delete(sId);
+          }
+          for (const [pId, rId] of this.persistentToRoom.entries()) {
+            if (rId === roomId) this.persistentToRoom.delete(pId);
+          }
         }
       }
       this.socketToRoom.delete(socketId);

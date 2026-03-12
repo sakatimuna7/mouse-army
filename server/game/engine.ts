@@ -1,6 +1,7 @@
 import { Server, Socket } from "socket.io";
 import { v4 as uuidv4 } from "uuid";
 import { QuadTree, IQuadEntity, IRect } from "./quadtree.js";
+import { BOT_NAMES } from "./bot-names.js";
 
 interface IPlayerData extends IQuadEntity {
   userId: string;
@@ -13,6 +14,11 @@ interface IPlayerData extends IQuadEntity {
   isStunned: boolean;
   spawnTime: number;
   persistentId: string;
+  isBot?: boolean;
+  botType?: "Hunter" | "Scavenger" | "Wanderer";
+  targetId?: string;
+  inventory?: string[];
+  lastActionTime?: number;
 }
 
 interface IItemData extends IQuadEntity {
@@ -35,6 +41,11 @@ export class GameEngine {
   private readonly TICK_MS = 1000 / 20;
   private readonly AOI_RADIUS = 600;
   private onPlayerDeath?: (persistentId: string) => void;
+  
+  private tickInterval: any;
+  private itemInterval: any;
+  private scoreInterval: any;
+  private botInterval: any;
 
   constructor(io: Server, roomId: string, onPlayerDeath?: (persistentId: string) => void) {
     this.io = io;
@@ -44,10 +55,11 @@ export class GameEngine {
     this.startTickLoop();
     this.startItemSpawnLoop();
     this.startSurvivalScoreLoop();
+    this.startBotSpawnLoop();
   }
 
   private startTickLoop() {
-    setInterval(() => {
+    this.tickInterval = setInterval(() => {
       this.tick();
     }, this.TICK_MS);
   }
@@ -59,8 +71,12 @@ export class GameEngine {
     Object.values(this.players).forEach(p => this.quadTree.insert(p));
     Object.values(this.items).forEach(i => this.quadTree.insert(i));
 
+    // Update Bots AI
+    this.updateBots();
+
     // 2. Interest Management (AOI)
     Object.values(this.players).forEach(player => {
+      if (player.isBot) return; // Bots don't have sockets
       const socket = this.io.sockets.sockets.get(player.userId);
       if (socket) {
         const nearbyEntities = this.quadTree.query({
@@ -99,7 +115,7 @@ export class GameEngine {
   }
 
   private startItemSpawnLoop() {
-    setInterval(() => {
+    this.itemInterval = setInterval(() => {
       if (Object.keys(this.items).length < this.MAX_ITEMS) {
         const types: ("bomb" | "speed" | "hook")[] = ["bomb", "speed", "hook"];
         const newItem: IItemData = {
@@ -117,7 +133,7 @@ export class GameEngine {
   }
 
   private startSurvivalScoreLoop() {
-    setInterval(() => {
+    this.scoreInterval = setInterval(() => {
       Object.values(this.players).forEach(player => {
         if (!player.isDead) {
           player.score += 1;
@@ -137,6 +153,18 @@ export class GameEngine {
         score: p.score
       }));
     this.io.to(this.roomId).emit("leaderboardUpdate", leaderboard);
+  }
+
+  public stop() {
+    clearInterval(this.tickInterval);
+    clearInterval(this.itemInterval);
+    clearInterval(this.scoreInterval);
+    clearInterval(this.botInterval);
+    console.log(`GameEngine for room ${this.roomId} stopped.`);
+  }
+
+  public hasActiveHumans(): boolean {
+    return Object.values(this.players).some(p => !p.isBot && !this.io.sockets.sockets.get(p.userId)?.disconnected);
   }
 
   public getPlayerByPersistentId(persistentId: string) {
@@ -222,13 +250,41 @@ export class GameEngine {
     });
 
     nearbyEntities.forEach((entity: IQuadEntity) => {
-      if (this.players[entity.id] && entity.id !== socketId) {
-        const socket = this.io.sockets.sockets.get(entity.id);
-        if (socket) {
-          socket.emit("playerAttack", {
-            attackerId: socketId,
-            ...attackData,
-          });
+      const player = this.players[entity.id];
+      if (player && !player.isDead) {
+        // Calculate Distance
+        const dx = player.x - attackData.x;
+        const dy = player.y - attackData.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist < attackData.radius) {
+          const forceScale = 1 - (dist / attackData.radius);
+          const damage = Math.floor(10 * forceScale); // Assuming 10 is base ATTACK_DAMAGE
+
+          // Apply Knockback (Server position update)
+          const angle = Math.atan2(dy, dx);
+          player.x += Math.cos(angle) * attackData.force * forceScale * 0.05; // 0.05 is a small factor for server-side push
+          player.y += Math.sin(angle) * attackData.force * forceScale * 0.05;
+
+          // Apply Damage
+          player.health -= damage;
+          if (player.health <= 0) {
+            player.health = 0;
+            if (player.isBot) {
+              this.handleKilled(socketId, { victimId: player.id, killerId: socketId });
+            }
+          }
+        }
+
+        // Broadcast to neighbors (excluding attacker for humans)
+        if (entity.id !== socketId) {
+          const socket = this.io.sockets.sockets.get(entity.id);
+          if (socket) {
+            socket.emit("playerAttack", {
+              attackerId: socketId,
+              ...attackData,
+            });
+          }
         }
       }
     });
@@ -246,6 +302,10 @@ export class GameEngine {
     const victim = this.players[data.victimId];
     if (victim) {
       victim.isStunned = true;
+      // Authoritative position update: Move victim to the hooker's position
+      victim.x = data.x;
+      victim.y = data.y;
+
       this.io.to(this.roomId).emit("playerHookedEffect", {
         victimId: data.victimId,
         attackerId: socketId,
@@ -298,6 +358,17 @@ export class GameEngine {
     }
   }
 
+  handlePlayerDamage(socketId: string, data: { victimId: string, damage: number }) {
+    const victim = this.players[data.victimId];
+    if (victim && !victim.isDead) {
+      victim.health -= data.damage;
+      if (victim.health <= 0) {
+        victim.health = 0;
+        this.handleKilled(socketId, { victimId: data.victimId, killerId: socketId });
+      }
+    }
+  }
+
   handlePickup(socketId: string, itemId: string) {
     const item = this.items[itemId];
     if (item) {
@@ -309,5 +380,159 @@ export class GameEngine {
         socket.emit("itemAddedToInventory", itemType);
       }
     }
+  }
+
+  private startBotSpawnLoop() {
+    setInterval(() => {
+      const currentTotal = Object.keys(this.players).length;
+      if (currentTotal < 20) {
+        this.spawnBot();
+      }
+    }, 5000);
+  }
+
+  private spawnBot() {
+    const botId = `bot-${uuidv4()}`;
+    const types: ("Hunter" | "Scavenger" | "Wanderer")[] = ["Hunter", "Scavenger", "Wanderer"];
+    const botType = types[Math.floor(Math.random() * types.length)]!;
+    
+    const randomName = BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)] + "_" + Math.floor(Math.random() * 100);
+
+    const newBot: IPlayerData = {
+      id: botId,
+      userId: botId,
+      userName: `[BOT] ${randomName}`,
+      persistentId: `bot-persistent-${botId}`,
+      x: Math.random() * (this.WORLD_SIZE - 200) + 100,
+      y: Math.random() * (this.WORLD_SIZE - 200) + 100,
+      health: 100,
+      score: 0,
+      isDead: false,
+      isStunned: false,
+      spawnTime: Date.now(),
+      isBot: true,
+      botType: botType,
+      inventory: [],
+      lastActionTime: 0
+    };
+
+    this.players[botId] = newBot;
+    this.io.to(this.roomId).emit("newPlayer", newBot);
+  }
+
+  private updateBots() {
+    Object.values(this.players).forEach(bot => {
+      if (!bot.isBot || bot.isDead || bot.isStunned) return;
+
+      const now = Date.now();
+      
+      switch (bot.botType) {
+        case "Hunter":
+          this.logicHunter(bot, now);
+          break;
+        case "Scavenger":
+          this.logicScavenger(bot, now);
+          break;
+        case "Wanderer":
+          this.logicWanderer(bot, now);
+          break;
+      }
+
+      // Smooth move towards target (Server-side simplified)
+      // Actual movement logic: bots just interpolate x,y
+    });
+  }
+
+  private logicHunter(bot: IPlayerData, now: number) {
+    // Attack nearest player
+    let target = this.getNearestTarget(bot, (p) => !p.isDead && p.id !== bot.id);
+    if (target) {
+      const dist = this.getDist(bot, target);
+      this.moveTowards(bot, target.x, target.y, 160); // Base speed 160
+
+      if (dist < 200 && now - (bot.lastActionTime || 0) > 2000) {
+        // Use bomb
+        this.handleBomb(bot.id, { x: bot.x, y: bot.y, targetX: target.x, targetY: target.y });
+        bot.lastActionTime = now;
+      }
+    } else {
+        this.logicWanderer(bot, now);
+    }
+  }
+
+  private logicScavenger(bot: IPlayerData, now: number) {
+    // Find nearest item
+    let item = this.getNearestItem(bot);
+    if (item) {
+      this.moveTowards(bot, item.x, item.y, 180); // Scavengers are slightly faster
+      if (this.getDist(bot, item) < 40) {
+        this.handlePickup(bot.id, item.id);
+      }
+    } else {
+      this.logicWanderer(bot, now);
+    }
+  }
+
+  private logicWanderer(bot: IPlayerData, now: number) {
+    if (!bot.targetId || Math.random() < 0.02) {
+      bot.targetId = `pos-${Math.random()}-${Math.random()}`;
+      (bot as any).targetX = Math.random() * this.WORLD_SIZE;
+      (bot as any).targetY = Math.random() * this.WORLD_SIZE;
+    }
+    
+    this.moveTowards(bot, (bot as any).targetX, (bot as any).targetY, 120);
+  }
+
+  private moveTowards(bot: IPlayerData, tx: number, ty: number, speed: number) {
+    const dx = tx - bot.x;
+    const dy = ty - bot.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    
+    if (dist > 5) {
+      const vx = (dx / dist) * (speed / this.TICK_RATE);
+      const vy = (dy / dist) * (speed / this.TICK_RATE);
+      bot.x += vx;
+      bot.y += vy;
+      
+      // Wrap/Clamp to world
+      bot.x = Math.max(0, Math.min(this.WORLD_SIZE, bot.x));
+      bot.y = Math.max(0, Math.min(this.WORLD_SIZE, bot.y));
+    }
+  }
+
+  private getNearestTarget(bot: IPlayerData, filter: (p: IPlayerData) => boolean): IPlayerData | null {
+    let nearest: IPlayerData | null = null;
+    let minDist = 1000; // Search radius
+    
+    Object.values(this.players).forEach(p => {
+      if (filter(p)) {
+        const d = this.getDist(bot, p);
+        if (d < minDist) {
+          minDist = d;
+          nearest = p;
+        }
+      }
+    });
+    return nearest;
+  }
+
+  private getNearestItem(bot: IPlayerData): IItemData | null {
+    let nearest: IItemData | null = null;
+    let minDist = 2000;
+    
+    Object.values(this.items).forEach(i => {
+      const d = this.getDist(bot, i);
+      if (d < minDist) {
+        minDist = d;
+        nearest = i;
+      }
+    });
+    return nearest;
+  }
+
+  private getDist(a: {x: number, y: number}, b: {x: number, y: number}) {
+    const dx = a.x - b.x;
+    const dy = a.y - b.y;
+    return Math.sqrt(dx * dx + dy * dy);
   }
 }

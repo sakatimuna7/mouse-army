@@ -16,6 +16,9 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     // Health & Name properties
     public health: number = 100;
     public maxHealth: number = 100;
+    public playerName: string = "";
+    public isBot: boolean = false;
+    public isDead: boolean = false;
     private healthBar: Phaser.GameObjects.Graphics;
     public userName: string;
     private nameTag: Phaser.GameObjects.Text;
@@ -94,7 +97,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         // 0. Handle Stun
         if (this.isStunned) {
             this.setVelocity(0, 0);
-            this.updateHealthBar();
+            this.syncUI();
             if (this.trailEmitter) this.trailEmitter.stop();
             return;
         } else {
@@ -106,7 +109,9 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
             this.speedBoostTimer -= 16.6; 
             if (this.speedBoostTimer <= 0) {
                 this.currentMaxSpeed = this.baseMaxSpeed;
-                this.clearTint();
+                if (!this.isBot && !this.isAimingHook) {
+                    this.clearTint();
+                }
             }
         }
 
@@ -153,11 +158,28 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
             this.knockbackForce.set(0, 0);
         }
 
-        this.setVelocity(newVx, newVy);
+        if (this.body instanceof Phaser.Physics.Arcade.Body) {
+            this.body.setVelocity(newVx, newVy);
+        }
 
-        // 6. Update Health Bar & Name Tag Position
-        this.updateHealthBar();
-        this.nameTag.setPosition(this.x, this.y - 40);
+        this.syncUI();
+    }
+
+    public syncUI() {
+        if (!this.visible || this.isDead || !this.active) {
+            if (this.healthBar) this.healthBar.setVisible(false);
+            if (this.nameTag) this.nameTag.setVisible(false);
+            return;
+        }
+
+        if (this.healthBar) {
+            this.healthBar.setVisible(true);
+            this.updateHealthBar();
+        }
+        if (this.nameTag) {
+            this.nameTag.setVisible(true);
+            this.nameTag.setPosition(this.x, this.y - 40);
+        }
     }
 
     public updateHealthBar() {

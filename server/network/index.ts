@@ -35,6 +35,10 @@ io.on("connection", (socket) => {
       room.engine.handleAttack(socket.id, attackData);
     });
 
+    socket.on("playerDamage", (data: { victimId: string, damage: number }) => {
+      room.engine.handlePlayerDamage(socket.id, data);
+    });
+
     socket.on("throwBomb", (bombData: any) => {
       room.engine.handleBomb(socket.id, bombData);
     });
