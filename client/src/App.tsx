@@ -33,6 +33,48 @@ function App() {
       <KillFeed />
       <Inventory />
       <Leaderboard />
+      
+      <button 
+        className="exit-btn"
+        onClick={() => useGameStore.getState().setJoined(false)}
+      >
+        <span>EXIT ROOM</span>
+      </button>
+
+      <style>{`
+        .exit-btn {
+          position: absolute;
+          top: 20px;
+          right: 20px;
+          background: rgba(255, 30, 30, 0.1);
+          border: 1px solid rgba(255, 30, 30, 0.3);
+          color: #ff4444;
+          padding: 8px 16px;
+          border-radius: 8px;
+          font-family: 'Outfit', sans-serif;
+          font-size: 12px;
+          font-weight: 800;
+          letter-spacing: 1px;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          backdrop-filter: blur(10px);
+          z-index: 2000;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .exit-btn:hover {
+          background: rgba(255, 30, 30, 0.2);
+          border-color: #ff4444;
+          box-shadow: 0 0 20px rgba(255, 30, 30, 0.2);
+          transform: translateY(-2px);
+        }
+
+        .exit-btn:active {
+          transform: translateY(0);
+        }
+      `}</style>
     </div>
   );
 }

@@ -172,6 +172,10 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         this.healthBar.fillRect(x + 1, y + 1, (barWidth - 2) * healthPercent, barHeight - 2);
     }
 
+    public isSpeedBoostActive(): boolean {
+        return this.speedBoostTimer > 0;
+    }
+
     public activateSpeedBoost(durationMs: number) {
         this.currentMaxSpeed = this.baseMaxSpeed * 1.8;
         this.speedBoostTimer = durationMs;

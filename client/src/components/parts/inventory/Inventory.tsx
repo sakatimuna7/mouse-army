@@ -1,6 +1,23 @@
 import React from 'react';
 import { useGameStore } from '../../../store/useGameStore';
 
+const TurboIndicator: React.FC = () => {
+    const { turboCount } = useGameStore();
+    return (
+        <div className="turbo-wrap">
+            <span className="turbo-label">TURBO [Q]</span>
+            <div className="turbo-charges">
+                {[...Array(3)].map((_, i) => (
+                    <div 
+                        key={i} 
+                        className={`turbo-charge ${i < turboCount ? 'active' : ''}`}
+                    />
+                ))}
+            </div>
+        </div>
+    );
+};
+
 export const Inventory: React.FC = () => {
     const { inventory } = useGameStore();
 
@@ -23,6 +40,9 @@ export const Inventory: React.FC = () => {
                     <div key={`empty-${i}`} className="inventory-slot empty" />
                 ))}
             </div>
+
+            {/* Turbo Stack Indicator */}
+            <TurboIndicator />
 
             <style>{`
                 .inventory-outer {
@@ -80,6 +100,47 @@ export const Inventory: React.FC = () => {
 
                 .item-icon {
                     font-size: 1.5rem;
+                }
+
+                .turbo-wrap {
+                    position: absolute;
+                    left: calc(100% + 15px);
+                    bottom: 0;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    gap: 6px;
+                }
+
+                .turbo-label {
+                    color: rgba(255, 255, 0, 0.7);
+                    font-size: 9px;
+                    font-weight: 900;
+                    letter-spacing: 1px;
+                    text-shadow: 0 0 10px rgba(255, 255, 0, 0.3);
+                }
+
+                .turbo-charges {
+                    display: flex;
+                    gap: 4px;
+                    background: rgba(0, 0, 0, 0.4);
+                    padding: 6px;
+                    border-radius: 8px;
+                    border: 1px solid rgba(255, 255, 0, 0.2);
+                }
+
+                .turbo-charge {
+                    width: 12px;
+                    height: 18px;
+                    background: rgba(255, 255, 255, 0.05);
+                    border-radius: 3px;
+                    transition: all 0.2s ease;
+                }
+
+                .turbo-charge.active {
+                    background: #ffff00;
+                    box-shadow: 0 0 15px #ffff00, inset 0 0 8px rgba(255,255,255,0.8);
+                    transform: scale(1.1);
                 }
             `}</style>
         </div>

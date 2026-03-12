@@ -48,6 +48,9 @@ export class MainScene extends Phaser.Scene {
   private readonly BOMB_DAMAGE = 60;
   private readonly HOOK_RANGE = 450;
   private readonly STUN_DURATION = 1500;
+  private lastTurboTime: number = 0;
+  private readonly TURBO_COOLDOWN = 1200;
+  private readonly TURBO_DURATION = 5000;
 
   // Particles
   private explosionEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
@@ -262,6 +265,11 @@ export class MainScene extends Phaser.Scene {
         this.useHook();
       }
     });
+
+    const qKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
+    qKey?.on("down", () => {
+      this.useTurbo();
+    });
   }
 
   private setupNetworkListeners() {
@@ -314,13 +322,23 @@ export class MainScene extends Phaser.Scene {
     this.networkManager.on("itemAddedToInventory", (type: string) => {
       if (this.player) {
         if (type === "speed") {
-          this.player.activateSpeedBoost(5000);
-          this.showFloatingText(
-            this.player.x,
-            this.player.y - 40,
-            "TURBO MODE!",
-            0xffff00,
-          );
+          const { turboCount, setTurboCount } = useGameStore.getState();
+          if (turboCount < 3) {
+            setTurboCount(turboCount + 1);
+            this.showFloatingText(
+                this.player.x,
+                this.player.y - 40,
+                "+1 TURBO CHARGE",
+                0xffff00,
+            );
+          } else {
+             this.showFloatingText(
+                this.player.x,
+                this.player.y - 40,
+                "TURBO FULL!",
+                0xffaa00,
+            );
+          }
         } else {
           this.player.addToInventory(type);
           this.showFloatingText(
@@ -632,6 +650,43 @@ export class MainScene extends Phaser.Scene {
       radius: this.ATTACK_RADIUS,
       force: this.ATTACK_FORCE,
     });
+  }
+
+  private useTurbo() {
+    if (!this.player || !this.player.visible || this.player.isStunned) return;
+    
+    // 1. Cannot activate during active boost
+    if (this.player.isSpeedBoostActive()) {
+        this.showFloatingText(this.player.x, this.player.y - 40, "TURBO ACTIVE!", 0xffff00);
+        return;
+    }
+    
+    const { turboCount, setTurboCount } = useGameStore.getState();
+    const now = this.time.now;
+
+    // 2. Cooldown 1.2s starts AFTER duration 5s
+    const totalCycle = this.TURBO_DURATION + this.TURBO_COOLDOWN;
+
+    if (turboCount > 0 && now - this.lastTurboTime > totalCycle) {
+      this.lastTurboTime = now;
+      setTurboCount(turboCount - 1);
+      this.player.activateSpeedBoost(this.TURBO_DURATION);
+
+      this.showFloatingText(
+        this.player.x,
+        this.player.y - 40,
+        "SPEED BOOST!",
+        0xffff00,
+      );
+    } else if (turboCount > 0) {
+        const remainingCd = Math.ceil((totalCycle - (now - this.lastTurboTime)) / 1000);
+        this.showFloatingText(
+            this.player.x,
+            this.player.y - 40,
+            `WAIT ${remainingCd}s`,
+            0xff4444,
+        );
+    }
   }
 
   private showAttackEffect(

@@ -21,10 +21,12 @@ interface IGameStore {
     isJoined: boolean;
     persistentId: string;
     killLogs: IKillLog[];
+    turboCount: number;
     setLeaderboard: (data: ILeaderboardEntry[]) => void;
     setInventory: (items: string[]) => void;
     setPlayerName: (name: string) => void;
     setJoined: (status: boolean) => void;
+    setTurboCount: (count: number) => void;
     addKillLog: (log: Omit<IKillLog, 'id'>) => void;
 }
 
@@ -44,6 +46,7 @@ export const useGameStore = create<IGameStore>((set) => ({
     isJoined: localStorage.getItem('mouse_army_is_joined') === 'true',
     persistentId: getPersistentId(),
     killLogs: [],
+    turboCount: 0,
     setLeaderboard: (data) => set({ leaderboard: data }),
     setInventory: (items) => set({ inventory: items }),
     setPlayerName: (name) => {
@@ -54,6 +57,7 @@ export const useGameStore = create<IGameStore>((set) => ({
         localStorage.setItem('mouse_army_is_joined', status ? 'true' : 'false');
         set({ isJoined: status });
     },
+    setTurboCount: (count) => set({ turboCount: count }),
     addKillLog: (log) => set((state) => ({ 
         killLogs: [...state.killLogs, { ...log, id: Math.random().toString(36).substring(7) }].slice(-5) 
     })),
