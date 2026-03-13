@@ -30,6 +30,20 @@ interface IItemData extends IQuadEntity {
   y: number;
 }
 
+enum BlackHoleState {
+  None,
+  Warning,
+  Active,
+  Collapse
+}
+
+interface IBlackHole {
+  x: number;
+  y: number;
+  state: BlackHoleState;
+  startTime: number;
+}
+
 export class GameEngine {
   private io: Server;
   private roomId: string;
@@ -48,6 +62,18 @@ export class GameEngine {
   private itemInterval: any;
   private scoreInterval: any;
   private botInterval: any;
+  private blackHoleInterval: any;
+
+  // Black Hole Properties
+  private blackHole: IBlackHole = { x: 0, y: 0, state: BlackHoleState.None, startTime: 0 };
+  private readonly BLACK_HOLE_SPAWN_INTERVAL = [25000, 40000]; // 25-40 seconds
+  private readonly BLACK_HOLE_WARNING_DURATION = 2000;
+  private readonly BLACK_HOLE_GRACE_DURATION = 1200;
+  private readonly BLACK_HOLE_ACTIVE_DURATION = 5000; // Total active time (including 1.2s grace)
+  private readonly BLACK_HOLE_OUTER_RADIUS = 500;
+  private readonly BLACK_HOLE_EFFECTIVE_RADIUS = 300;
+  private readonly BLACK_HOLE_CORE_RADIUS = 90;
+  private readonly BLACK_HOLE_GRAVITY_STRENGTH = 1000; // Adjusted for 20 TPS
 
   constructor(io: Server, roomId: string, onPlayerDeath?: (persistentId: string) => void) {
     this.io = io;
@@ -58,6 +84,7 @@ export class GameEngine {
     this.startItemSpawnLoop();
     this.startSurvivalScoreLoop();
     this.startBotSpawnLoop();
+    this.startBlackHoleLoop();
   }
 
   private startTickLoop() {
@@ -106,6 +133,9 @@ export class GameEngine {
         });
       }
     });
+
+    // 3. Update Black Hole
+    this.updateBlackHole();
 
     const endTime = performance.now();
     const tickDuration = endTime - startTime;
@@ -162,6 +192,7 @@ export class GameEngine {
     clearInterval(this.itemInterval);
     clearInterval(this.scoreInterval);
     clearInterval(this.botInterval);
+    clearInterval(this.blackHoleInterval);
     console.log(`GameEngine for room ${this.roomId} stopped.`);
   }
 
@@ -669,5 +700,173 @@ export class GameEngine {
     const dx = a.x - b.x;
     const dy = a.y - b.y;
     return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  private startBlackHoleLoop() {
+    const scheduleNext = () => {
+      const waitTime = Math.random() * (this.BLACK_HOLE_SPAWN_INTERVAL[1] - this.BLACK_HOLE_SPAWN_INTERVAL[0]) + this.BLACK_HOLE_SPAWN_INTERVAL[0];
+      this.blackHoleInterval = setTimeout(() => {
+        this.initiateBlackHole();
+        scheduleNext();
+      }, waitTime);
+    };
+    scheduleNext();
+  }
+
+  private initiateBlackHole() {
+    if (this.blackHole.state !== BlackHoleState.None) return;
+
+    // Algorithm: Choose spawn near player clusters
+    const allPlayers = Object.values(this.players);
+    if (allPlayers.length === 0) return;
+
+    const randomPlayer = allPlayers[Math.floor(Math.random() * allPlayers.length)];
+    const angle = Math.random() * Math.PI * 2;
+    const dist = Math.random() * 200;
+
+    let spawnX = randomPlayer.x + Math.cos(angle) * dist;
+    let spawnY = randomPlayer.y + Math.sin(angle) * dist;
+
+    // Clamp to map bounds
+    spawnX = Math.max(100, Math.min(this.WORLD_SIZE - 100, spawnX));
+    spawnY = Math.max(100, Math.min(this.WORLD_SIZE - 100, spawnY));
+
+    this.blackHole = {
+      x: spawnX,
+      y: spawnY,
+      state: BlackHoleState.Warning,
+      startTime: Date.now()
+    };
+
+    console.log(`Black Hole WARNING at (${spawnX.toFixed(0)}, ${spawnY.toFixed(0)})`);
+    this.io.to(this.roomId).emit("blackHoleWarning", { x: spawnX, y: spawnY });
+  }
+
+  private updateBlackHole() {
+    if (this.blackHole.state === BlackHoleState.None) return;
+
+    const now = Date.now();
+    const elapsed = now - this.blackHole.startTime;
+
+    if (this.blackHole.state === BlackHoleState.Warning) {
+      if (elapsed >= this.BLACK_HOLE_WARNING_DURATION) {
+        this.blackHole.state = BlackHoleState.Active;
+        this.blackHole.startTime = now;
+        this.io.to(this.roomId).emit("blackHoleSpawned", { x: this.blackHole.x, y: this.blackHole.y });
+        console.log("Black Hole ACTIVE");
+      }
+    } else if (this.blackHole.state === BlackHoleState.Active) {
+      this.applyBlackHoleGravity();
+
+      if (elapsed >= this.BLACK_HOLE_ACTIVE_DURATION) {
+        this.blackHole.state = BlackHoleState.Collapse;
+        this.blackHole.startTime = now;
+        this.io.to(this.roomId).emit("blackHoleCollapsed", { x: this.blackHole.x, y: this.blackHole.y });
+        console.log("Black Hole COLLAPSED");
+        
+        // Final collapse effect (knockback)
+        this.applyBlackHoleCollapse();
+        
+        // Reset after a short delay for animations
+        setTimeout(() => {
+          this.blackHole.state = BlackHoleState.None;
+        }, 1000);
+      }
+    }
+  }
+
+  private applyBlackHoleGravity() {
+    Object.values(this.players).forEach(player => {
+      if (player.isDead) return;
+
+      const dx = this.blackHole.x - player.x;
+      const dy = this.blackHole.y - player.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      const elapsed = Date.now() - this.blackHole.startTime;
+      const isGracePeriod = elapsed < this.BLACK_HOLE_GRACE_DURATION;
+
+      // Death logic (only after grace period)
+      if (dist < this.BLACK_HOLE_CORE_RADIUS && !isGracePeriod) {
+        this.handleKilled("environment", { victimId: player.id, killerId: "environment" });
+        return;
+      }
+
+      // Gravity logic
+      if (dist < this.BLACK_HOLE_OUTER_RADIUS) {
+        // force = gravityStrength * (1 - distance / influenceRadius)^2
+        const forceMag = this.BLACK_HOLE_GRAVITY_STRENGTH * Math.pow(1 - dist / this.BLACK_HOLE_OUTER_RADIUS, 2);
+        
+        // normalize direction
+        const dirX = dx / dist;
+        const dirY = dy / dist;
+
+        // Apply force
+        let appliedForceX = dirX * forceMag;
+        let appliedForceY = dirY * forceMag;
+
+        // Add orbital (tangential) force during grace period or for core swirling
+        if (isGracePeriod || dist < 150) {
+          const orbitalStrength = forceMag * 1.5; // Strong swirling
+          const tangentX = -dirY; // Clockwise
+          const tangentY = dirX;
+          
+          appliedForceX += tangentX * orbitalStrength;
+          appliedForceY += tangentY * orbitalStrength;
+        }
+
+        // Turbo Interaction
+        // playerVelocity * turboResistanceFactor (implied as part of server-side movement sync)
+        // If the player is actively moving away (checked via their input/velocity), we reduce the force
+        // Since movement is client-side authoritative in this engine, we emit a 'pushed' event
+        // but with a negative force (pull).
+        
+        const socket = this.io.sockets.sockets.get(player.userId);
+        if (socket) {
+          socket.emit("playerPushed", {
+            forceX: appliedForceX / this.TICK_RATE,
+            forceY: appliedForceY / this.TICK_RATE,
+            source: "blackhole"
+          });
+        }
+        
+        if (player.isBot) {
+          player.x += appliedForceX / this.TICK_RATE;
+          player.y += appliedForceY / this.TICK_RATE;
+        }
+      }
+    });
+  }
+
+  private applyBlackHoleCollapse() {
+    const collapseRadius = 400;
+    const knockbackForce = 50;
+
+    Object.values(this.players).forEach(player => {
+      if (player.isDead) return;
+
+      const dx = player.x - this.blackHole.x;
+      const dy = player.y - this.blackHole.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist < collapseRadius) {
+        const angle = Math.atan2(dy, dx);
+        const forceScale = 1 - (dist / collapseRadius);
+        
+        if (player.isBot) {
+          player.x += Math.cos(angle) * knockbackForce * forceScale;
+          player.y += Math.sin(angle) * knockbackForce * forceScale;
+        } else {
+          const socket = this.io.sockets.sockets.get(player.userId);
+          if (socket) {
+            socket.emit("playerPushed", {
+              forceX: Math.cos(angle) * knockbackForce * forceScale,
+              forceY: Math.sin(angle) * knockbackForce * forceScale,
+              source: "blackhole_collapse"
+            });
+          }
+        }
+      }
+    });
   }
 }

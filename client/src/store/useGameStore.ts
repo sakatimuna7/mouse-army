@@ -24,6 +24,7 @@ interface IGameStore {
     turboCount: number;
     hookCount: number;
     selectedInventoryIndex: number;
+    blackHoleMessage: string;
     setLeaderboard: (data: ILeaderboardEntry[]) => void;
     setInventory: (items: string[]) => void;
     setPlayerName: (name: string) => void;
@@ -31,6 +32,7 @@ interface IGameStore {
     setTurboCount: (count: number) => void;
     setHookCount: (count: number) => void;
     setInventoryIndex: (index: number) => void;
+    setBlackHoleMessage: (message: string) => void;
     addKillLog: (log: Omit<IKillLog, 'id'>) => void;
 }
 
@@ -53,6 +55,7 @@ export const useGameStore = create<IGameStore>((set) => ({
     turboCount: 0,
     hookCount: 0,
     selectedInventoryIndex: 0,
+    blackHoleMessage: "",
     setLeaderboard: (data) => set({ leaderboard: data }),
     setInventory: (items) => set((state) => {
         // Clamp index if inventory shrinks
@@ -70,6 +73,7 @@ export const useGameStore = create<IGameStore>((set) => ({
     setTurboCount: (count) => set({ turboCount: count }),
     setHookCount: (count) => set({ hookCount: count }),
     setInventoryIndex: (index) => set({ selectedInventoryIndex: index }),
+    setBlackHoleMessage: (message) => set({ blackHoleMessage: message }),
     addKillLog: (log) => set((state) => ({ 
         killLogs: [...state.killLogs, { ...log, id: Math.random().toString(36).substring(7) }].slice(-5) 
     })),

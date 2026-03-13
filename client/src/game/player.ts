@@ -207,7 +207,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     }
 
     public activateSpeedBoost(durationMs: number) {
-        this.currentMaxSpeed = this.baseMaxSpeed * 1.8;
+        this.currentMaxSpeed = this.baseMaxSpeed * 3.0;
         this.speedBoostTimer = durationMs;
         this.setTint(0xffff00);
     }

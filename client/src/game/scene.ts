@@ -50,11 +50,16 @@ export class MainScene extends Phaser.Scene {
   private readonly HOOK_RANGE = 160;
   private readonly STUN_DURATION = 1500;
   private lastTurboTime: number = 0;
-  private readonly TURBO_COOLDOWN = 1200;
-  private readonly TURBO_DURATION = 5000;
+  private readonly TURBO_COOLDOWN = 4000;
+  private readonly TURBO_DURATION = 600;
 
   // Particles
   private explosionEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private vortexEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
+
+  // Black Hole Visuals
+  private blackHoleContainer: Phaser.GameObjects.Container | null = null;
+  private blackHoleTelegraph: Phaser.GameObjects.Graphics | null = null;
 
   constructor() {
     super({ key: "MainScene" });
@@ -90,18 +95,30 @@ export class MainScene extends Phaser.Scene {
 
     // 3. Camera Setup
     this.cameras.main.setBounds(0, 0, this.WORLD_SIZE, this.WORLD_SIZE);
-
     // 4. Particles
     this.explosionEmitter = this.add.particles(0, 0, "spark", {
-      speed: { min: -200, max: 200 },
-      angle: { min: 0, max: 360 },
-      scale: { start: 0.8, end: 0 },
+      speed: { min: 50, max: 150 },
+      scale: { start: 1, end: 0 },
       alpha: { start: 1, end: 0 },
-      lifespan: 800,
-      quantity: 50,
+      lifespan: 600,
       emitting: false,
+      blendMode: 'ADD',
     });
     this.explosionEmitter.setDepth(5);
+
+    this.vortexEmitter = this.add.particles(0, 0, "spark", {
+      speed: 0,
+      scale: { start: 0.5, end: 0 },
+      alpha: { start: 0.8, end: 0 },
+      lifespan: 1500,
+      quantity: 10,
+      emitting: false,
+      blendMode: 'ADD',
+      tint: 0x4400ff,
+      moveToX: 0,
+      moveToY: 0,
+    });
+    this.vortexEmitter.setDepth(4);
 
     // 5. Input Handling
     this.setupInputs();
@@ -133,6 +150,9 @@ export class MainScene extends Phaser.Scene {
       this.networkManager.off("playerRespawn");
       this.networkManager.off("playerDisconnected");
       this.networkManager.off("killLog");
+      this.networkManager.off("blackHoleWarning");
+      this.networkManager.off("blackHoleSpawned");
+      this.networkManager.off("blackHoleCollapsed");
     });
   }
 
@@ -155,6 +175,9 @@ export class MainScene extends Phaser.Scene {
 
     // C. Physical Bomb (thrown)
     this.drawPhysicalBomb();
+
+    // D. Black Hole Assets
+    this.drawBlackHoleAssets();
   }
 
   private drawNeonCursor(key: string, color: number) {
@@ -230,11 +253,43 @@ export class MainScene extends Phaser.Scene {
       g.strokeCircle(size/2, size/2, 10);
       
       // Glow
-      g.lineStyle(4, 0xff4400, 0.4);
+      g.lineStyle(4, 0xff4444, 0.4);
       g.strokeCircle(size/2, size/2, 12);
       
       g.generateTexture("bomb_phys", size, size);
       g.destroy();
+  }
+
+  private drawBlackHoleAssets() {
+      // 1. Vortex Spiral
+      const size = 256;
+      const g = this.make.graphics({ x: 0, y: 0 });
+      
+      g.lineStyle(2, 0x4400ff, 0.8);
+      for (let i = 0; i < 8; i++) {
+          const angle = (i / 8) * Math.PI * 2;
+          g.beginPath();
+          for (let r = 0; r < size / 2; r += 2) {
+              const spiralAngle = angle + (r / 20);
+              const x = size / 2 + Math.cos(spiralAngle) * r;
+              const y = size / 2 + Math.sin(spiralAngle) * r;
+              if (r === 0) g.moveTo(x, y);
+              else g.lineTo(x, y);
+          }
+          g.strokePath();
+      }
+      
+      g.generateTexture("vortex_spiral", size, size);
+      g.destroy();
+
+      // 2. Core
+      const coreG = this.make.graphics({ x: 0, y: 0 });
+      coreG.fillStyle(0x000000, 1);
+      coreG.fillCircle(size / 2, size / 2, 40);
+      coreG.lineStyle(4, 0x4400ff, 1);
+      coreG.strokeCircle(size / 2, size / 2, 40);
+      coreG.generateTexture("vortex_core", size, size);
+      coreG.destroy();
   }
 
   private setupInputs() {
@@ -368,10 +423,19 @@ export class MainScene extends Phaser.Scene {
 
     this.networkManager.on("playerPushed", (data: { forceX: number, forceY: number }) => {
         if (this.player && this.player.visible) {
+            // Resist gravity if Turbo is active (50% resistance)
+            let fx = data.forceX;
+            let fy = data.forceY;
+            
+            if (this.player.isSpeedBoostActive()) {
+                fx *= 0.5;
+                fy *= 0.5;
+            }
+
             this.tweens.add({
                 targets: this.player,
-                x: this.player.x + data.forceX,
-                y: this.player.y + data.forceY,
+                x: this.player.x + fx,
+                y: this.player.y + fy,
                 duration: 200,
                 ease: "Cubic.out"
             });
@@ -584,6 +648,138 @@ export class MainScene extends Phaser.Scene {
     this.networkManager.on("killLog", (data: { killerName: string, victimName: string, timestamp: number }) => {
       useGameStore.getState().addKillLog(data);
     });
+
+    this.networkManager.on("blackHoleWarning", (data: { x: number, y: number }) => {
+        this.handleBlackHoleWarning(data.x, data.y);
+    });
+
+    this.networkManager.on("blackHoleSpawned", (data: { x: number, y: number }) => {
+        this.handleBlackHoleSpawned(data.x, data.y);
+    });
+
+    this.networkManager.on("blackHoleCollapsed", (data: { x: number, y: number }) => {
+        this.handleBlackHoleCollapsed(data.x, data.y);
+    });
+  }
+
+  private handleBlackHoleWarning(x: number, y: number) {
+      useGameStore.getState().setBlackHoleMessage("⚠ GRAVITY ANOMALY DETECTED");
+      this.cameras.main.shake(1000, 0.005);
+      
+      if (this.blackHoleTelegraph) this.blackHoleTelegraph.destroy();
+      
+      this.blackHoleTelegraph = this.add.graphics();
+      this.blackHoleTelegraph.setDepth(1);
+      
+      // Animated expanding ring
+      this.tweens.addCounter({
+          from: 0,
+          to: 500,
+          duration: 2000,
+          onUpdate: (tween) => {
+              const val = tween.getValue();
+              if (this.blackHoleTelegraph && val !== null) {
+                  this.blackHoleTelegraph.clear();
+                  this.blackHoleTelegraph.lineStyle(2, 0xff0000, 1 - (val / 500));
+                  this.blackHoleTelegraph.strokeCircle(x, y, val);
+                  this.blackHoleTelegraph.lineStyle(4, 0xff4444, 0.3);
+                  this.blackHoleTelegraph.strokeCircle(x, y, 90); // Core indicator
+              }
+          }
+      });
+  }
+
+  private handleBlackHoleSpawned(x: number, y: number) {
+      useGameStore.getState().setBlackHoleMessage("");
+      if (this.blackHoleTelegraph) {
+          this.blackHoleTelegraph.destroy();
+          this.blackHoleTelegraph = null;
+      }
+
+      this.blackHoleContainer = this.add.container(x, y);
+      this.blackHoleContainer.setDepth(4);
+
+      const spiral = this.add.sprite(0, 0, "vortex_spiral");
+      const core = this.add.sprite(0, 0, "vortex_core");
+      
+      this.blackHoleContainer.add([spiral, core]);
+
+      // State visual: Grace Period (Orbiting)
+      core.setTint(0x00ffff); // Cyan during grace
+      spiral.setTint(0x00ffff);
+      
+      // Animations
+      this.tweens.add({
+          targets: spiral,
+          angle: 360,
+          duration: 800, // Faster during orbit
+          repeat: -1,
+          ease: 'Linear'
+      });
+
+      this.tweens.add({
+          targets: core,
+          scale: 1.4,
+          duration: 300,
+          repeat: -1,
+          yoyo: true,
+          ease: 'Cubic.easeInOut'
+      });
+
+      // Transition to Lethal State after 1.2s
+      this.time.delayedCall(1200, () => {
+          if (core.active) {
+              core.clearTint();
+              spiral.clearTint();
+              this.showFloatingText(x, y, "CORE COMPRESSION", 0xff0000);
+              this.cameras.main.shake(200, 0.02);
+              
+              // Slow down rotation slightly for 'heavy' feel
+              this.tweens.add({
+                  targets: spiral,
+                  angle: 360,
+                  duration: 1200,
+                  repeat: -1,
+                  ease: 'Linear'
+              });
+          }
+      });
+
+      // Particle system setup
+      this.vortexEmitter.setPosition(x, y);
+      this.vortexEmitter.start();
+      
+      // Radial attraction particles
+      this.vortexEmitter.addEmitZone({
+          type: 'edge',
+          source: new Phaser.Geom.Circle(0, 0, 500),
+          quantity: 20
+      });
+
+      this.cameras.main.shake(3000, 0.01);
+  }
+
+  private handleBlackHoleCollapsed(x: number, y: number) {
+      if (this.blackHoleContainer) {
+          this.blackHoleContainer.destroy();
+          this.blackHoleContainer = null;
+      }
+      this.vortexEmitter.stop();
+
+      // Shockwave
+      const shockwave = this.add.circle(x, y, 10, 0xffffff, 0.8);
+      shockwave.setDepth(5);
+      this.tweens.add({
+          targets: shockwave,
+          radius: 600,
+          alpha: 0,
+          duration: 800,
+          ease: 'Cubic.out',
+          onComplete: () => shockwave.destroy()
+      });
+
+      this.createExplosion(x, y, 300);
+      this.cameras.main.shake(500, 0.03);
   }
 
   private useHook() {
