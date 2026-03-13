@@ -10,6 +10,28 @@ function App() {
   const gameRef = useRef<Phaser.Game | null>(null);
   const { isJoined, blackHoleMessage } = useGameStore();
   const [isPortrait, setIsPortrait] = React.useState(false);
+  const [mousePos, setMousePos] = React.useState({ x: 0, y: 0 });
+  const [isMouseDown, setIsMouseDown] = React.useState(false);
+  const isMobile = window.matchMedia("(pointer: coarse)").matches;
+
+  useEffect(() => {
+    if (isMobile) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      setMousePos({ x: e.clientX, y: e.clientY });
+    };
+    const handleMouseDown = () => setIsMouseDown(true);
+    const handleMouseUp = () => setIsMouseDown(false);
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mousedown', handleMouseDown);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mousedown', handleMouseDown);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isMobile]);
 
   useEffect(() => {
     const checkOrientation = () => {
@@ -33,6 +55,8 @@ function App() {
     };
   }, [isJoined]);
 
+  const [isMenuOpen, setIsMenuOpen] = React.useState(false);
+
   const toggleFullScreen = () => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch((err) => {
@@ -50,8 +74,19 @@ function App() {
   }
 
   return (
-    <div className="fixed inset-0 w-full h-full bg-[#1a1a1a] overflow-hidden touch-none select-none">
+    <div className="game-wrapper fixed inset-0 w-full h-full bg-[#1a1a1a] overflow-hidden touch-none select-none">
       <div id="game-container" className="w-full h-full overflow-hidden" />
+      
+      {/* Custom Cursor */}
+      {!isMobile && (
+        <div 
+          className={`custom-cursor ${isMouseDown ? 'active' : ''}`}
+          style={{ 
+            left: `${mousePos.x}px`,
+            top: `${mousePos.y}px`
+          }}
+        />
+      )}
       
       {isPortrait && (
         <div className="absolute inset-0 bg-[#0a0a0a] z-[5000] flex flex-col items-center justify-center p-8 text-center">
@@ -75,40 +110,110 @@ function App() {
         </div>
       )}
 
-      <div className="hud-actions">
+      <div className={`hud-settings ${isMenuOpen ? 'open' : ''}`}>
         <button 
-            className="action-btn exit"
-            onClick={() => useGameStore.getState().setJoined(false)}
+            className="settings-toggle"
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
         >
-            <div className="btn-icon">↩</div>
-            <span>LEAVE</span>
+            <div className="toggle-icon">{isMenuOpen ? '✕' : '⚙'}</div>
         </button>
 
-        <button 
-            className="action-btn fullscreen"
-            onClick={toggleFullScreen}
-        >
-            <div className="btn-icon">⛶</div>
-            <span>SCREEN</span>
-        </button>
+        {isMenuOpen && (
+          <div className="settings-menu">
+            <button 
+                className="action-btn exit"
+                onClick={() => useGameStore.getState().setJoined(false)}
+            >
+                <div className="btn-icon">↩</div>
+                <span>LEAVE</span>
+            </button>
+
+            <button 
+                className="action-btn fullscreen"
+                onClick={toggleFullScreen}
+            >
+                <div className="btn-icon">⛶</div>
+                <span>SCREEN</span>
+            </button>
+          </div>
+        )}
       </div>
 
       <style>{`
-        .hud-actions {
+        * {
+          cursor: none !important;
+        }
+
+        .custom-cursor {
+          position: fixed;
+          width: 8px;
+          height: 8px;
+          background: #ffffff;
+          border-radius: 50%;
+          pointer-events: none;
+          z-index: 9999;
+          box-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 0 20px rgba(255, 255, 255, 0.4);
+          transform: translate(-50%, -50%);
+          transition: width 0.2s ease, height 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
+          mix-blend-mode: difference;
+        }
+
+        .custom-cursor.active {
+          width: 6px;
+          height: 6px;
+          opacity: 0.8;
+          box-shadow: 0 0 5px rgba(255, 255, 255, 0.8);
+        }
+
+        .hud-settings {
           position: absolute;
           top: 20px;
-          left: 20px;
+          left: 190px; /* To the right of minimap (150px size + padding) */
           display: flex;
           flex-direction: column;
           gap: 10px;
           z-index: 2000;
         }
 
+        .settings-toggle {
+          width: 44px;
+          height: 44px;
+          background: rgba(255, 255, 255, 0.1);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 12px;
+          color: white;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          backdrop-filter: blur(10px);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .settings-toggle:hover {
+          background: rgba(255, 255, 255, 0.2);
+          transform: scale(1.05);
+        }
+
+        .toggle-icon {
+          font-size: 20px;
+        }
+
+        .settings-menu {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          animation: menuSlideDown 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes menuSlideDown {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+
         @media (max-width: 1024px) {
-          .hud-actions {
-            top: 180px; /* Below minimap */
-            left: 15px;
-            gap: 8px;
+          .hud-settings {
+            top: 20px; /* Keep at top */
+            left: 190px; /* Keep to the right of minimap */
           }
         }
 
@@ -129,7 +234,6 @@ function App() {
           font-size: 11px;
           font-weight: 800;
           letter-spacing: 1px;
-          cursor: pointer;
           transition: all 0.3s ease;
           backdrop-filter: blur(15px);
           display: flex;

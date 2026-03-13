@@ -36,7 +36,7 @@ export const KillFeed: React.FC = () => {
             <style>{`
                 .kill-feed-root {
                     position: absolute;
-                    top: 100px;
+                    top: 180px; /* Below minimap (150px size + 20px padding) */
                     left: 20px;
                     display: flex;
                     flex-direction: column;
@@ -83,12 +83,12 @@ export const KillFeed: React.FC = () => {
                 }
 
                 /* Mobile Adjustment */
-                @media (max-width: 900px) {
+                @media (max-width: 1024px) {
                     .kill-feed-root {
-                        top: 50%;
-                        left: 10px;
-                        transform: translateY(-50%) scale(0.8);
-                        transform-origin: left center;
+                        top: 180px;
+                        left: 20px;
+                        transform: scale(0.85);
+                        transform-origin: left top;
                     }
                     .kill-item {
                         padding: 4px 10px;

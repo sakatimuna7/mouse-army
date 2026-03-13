@@ -1382,14 +1382,16 @@ export class MainScene extends Phaser.Scene {
     }
 
     // Set deterministic zoom for world
-    const baseWidth = 1280;
-    const baseHeight = 720;
+    // Larger base resolution = Wider Field of View (more map visible)
+    const baseWidth = 2000;
+    const baseHeight = 1125;
     const zoomX = width / baseWidth;
     const zoomY = height / baseHeight;
     const zoom = Math.min(zoomX, zoomY);
     
     this.cameras.main.setZoom(zoom);
     this.cameras.main.setViewport(0, 0, width, height);
+    this.cameras.main.setBounds(0, 0, this.WORLD_SIZE, this.WORLD_SIZE);
 
     // Reposition minimap
     if (this.minimapContainer) {

@@ -267,7 +267,6 @@ export const Lobby: React.FC = () => {
                     padding: 20px;
                     font-size: 1.1rem;
                     font-weight: 900;
-                    cursor: pointer;
                     transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
                     overflow: hidden;
                 }
@@ -300,7 +299,6 @@ export const Lobby: React.FC = () => {
 
                 .lobby-button:disabled {
                     opacity: 0.5;
-                    cursor: not-allowed;
                     filter: grayscale(1);
                 }
 
