@@ -83,17 +83,21 @@ export const KillFeed: React.FC = () => {
                 }
 
                 /* Mobile Adjustment */
-                @media (max-width: 768px) {
+                @media (max-width: 900px) {
                     .kill-feed-root {
-                        top: 80px;
+                        top: 50%;
                         left: 10px;
+                        transform: translateY(-50%) scale(0.8);
+                        transform-origin: left center;
                     }
                     .kill-item {
-                        padding: 6px 12px;
-                        font-size: 0.75rem;
+                        padding: 4px 10px;
+                        font-size: 0.6rem;
+                        border-radius: 6px;
+                        gap: 6px;
                     }
                     .killer-name, .victim-name {
-                        font-size: 0.75rem;
+                        font-size: 0.6rem;
                     }
                 }
             `}</style>

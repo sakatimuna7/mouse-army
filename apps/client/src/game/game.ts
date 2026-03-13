@@ -3,8 +3,9 @@ import { MainScene } from "./scene";
 
 export const phaserConfig: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
-  width: 1200,
-  height: 700,
+  scale: {
+    mode: Phaser.Scale.RESIZE,
+  },
   parent: "game-container",
   backgroundColor: "#1a1a1a",
   physics: {

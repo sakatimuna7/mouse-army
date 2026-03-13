@@ -234,21 +234,48 @@ export const Inventory: React.FC = () => {
                 }
 
                 /* Mobile Support */
-                @media (max-width: 640px) {
+                @media (max-width: 900px) {
                     .hud-bottom {
-                        bottom: 20px;
-                        width: 90%;
+                        bottom: 12px;
+                        width: auto;
+                        transform: translateX(-50%) scale(0.8);
                     }
                     .inventory-grid {
-                        gap: 8px;
-                        padding: 8px;
+                        gap: 4px;
+                        padding: 4px;
+                        border-radius: 10px;
                     }
                     .inventory-slot {
-                        width: 44px;
-                        height: 44px;
+                        width: 32px;
+                        height: 32px;
+                        border-radius: 6px;
+                    }
+                    .slot-num {
+                        top: 2px;
+                        left: 3px;
+                        font-size: 5px;
                     }
                     .item-icon {
-                        font-size: 1.3rem;
+                        font-size: 0.8rem;
+                    }
+                    .abilities-section {
+                        gap: 8px;
+                        padding: 3px 8px;
+                        margin-top: -4px;
+                    }
+                    .charge-dot {
+                        width: 6px;
+                        height: 2px;
+                    }
+                    .ability-label {
+                        font-size: 5px;
+                    }
+                }
+
+                @media (max-width: 600px) {
+                    .hud-bottom {
+                        transform: translateX(-50%) scale(0.65);
+                        bottom: 6px;
                     }
                 }
             `}</style>

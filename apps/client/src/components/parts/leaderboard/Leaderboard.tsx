@@ -162,22 +162,44 @@ export const Leaderboard: React.FC = () => {
                 }
 
                 /* Mobile Support */
-                @media (max-width: 768px) {
+                @media (max-width: 900px) {
                     .leaderboard-wrapper {
-                        width: 180px;
-                        top: 10px;
-                        right: 10px;
-                        padding: 12px;
+                        width: 140px;
+                        top: 8px;
+                        right: 8px;
+                        padding: 8px;
+                        border-radius: 10px;
+                        transform: scale(0.85);
+                        transform-origin: top right;
                     }
                     .leaderboard-header {
-                        margin-bottom: 10px;
-                        padding-bottom: 8px;
+                        margin-bottom: 6px;
+                        padding-bottom: 4px;
+                        gap: 4px;
                     }
-                    .username {
-                        font-size: 0.75rem;
+                    .leaderboard-list {
+                        gap: 2px;
                     }
-                    .score {
-                        font-size: 0.75rem;
+                    .leaderboard-item {
+                        padding: 2px 6px;
+                        gap: 4px;
+                        border-radius: 6px;
+                    }
+                    .username, .score {
+                        font-size: 0.65rem;
+                    }
+                    .rank-badge {
+                        width: 18px;
+                        height: 18px;
+                    }
+                    .leaderboard-title {
+                        font-size: 0.55rem;
+                    }
+                }
+                
+                @media (max-width: 600px) {
+                    .leaderboard-wrapper {
+                        transform: scale(0.7);
                     }
                 }
             `}</style>

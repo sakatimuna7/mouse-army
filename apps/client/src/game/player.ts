@@ -36,13 +36,18 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     // Visual Effects
     private trailEmitter: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
 
-    constructor(scene: Phaser.Scene, id: string, x: number, y: number, texture: string, userName: string) {
+    constructor(scene: Phaser.Scene, id: string, x: number, y: number, texture: string, userName: string, parentLayer?: Phaser.GameObjects.Container) {
         super(scene, x, y, texture);
         this.playerId = id;
         this.userName = userName;
 
-        scene.add.existing(this);
-        scene.physics.add.existing(this);
+        if (parentLayer) {
+            parentLayer.add(this);
+            scene.physics.add.existing(this);
+        } else {
+            scene.add.existing(this);
+            scene.physics.add.existing(this);
+        }
 
         this.setCollideWorldBounds(true);
         this.setDepth(2);
@@ -61,6 +66,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         // Initialize Health Bar
         this.healthBar = scene.add.graphics();
         this.healthBar.setDepth(3);
+        if (parentLayer) parentLayer.add(this.healthBar);
         
         // Initialize Name Tag
         this.nameTag = scene.add.text(x, y - 40, this.userName, {
@@ -70,14 +76,15 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
             backgroundColor: 'rgba(0,0,0,0.4)',
             padding: { x: 4, y: 2 }
         }).setOrigin(0.5).setDepth(3);
+        if (parentLayer) parentLayer.add(this.nameTag);
 
         this.updateHealthBar();
 
         // Initialize Trail
-        this.createTrail();
+        this.createTrail(parentLayer);
     }
 
-    private createTrail() {
+    private createTrail(parentLayer?: Phaser.GameObjects.Container) {
         const particles = this.scene.add.particles(0, 0, this.texture.key, {
             speed: 0,
             scale: { start: 0.3, end: 0 },
@@ -88,6 +95,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
             frequency: 30
         });
         particles.setDepth(1);
+        if (parentLayer) parentLayer.add(particles);
         this.trailEmitter = particles;
     }
 

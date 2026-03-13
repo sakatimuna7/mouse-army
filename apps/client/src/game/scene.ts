@@ -26,6 +26,9 @@ export class MainScene extends Phaser.Scene {
   private minimapPointers!: Phaser.GameObjects.Graphics;
   private minimapContainer!: Phaser.GameObjects.Container;
   private hookRangeGraphics!: Phaser.GameObjects.Graphics;
+  private uiCamera!: Phaser.Cameras.Scene2D.Camera;
+  private worldLayer!: Phaser.GameObjects.Container;
+  private uiLayer!: Phaser.GameObjects.Container;
 
   // World & Config
   private readonly WORLD_SIZE = 5000;
@@ -51,6 +54,14 @@ export class MainScene extends Phaser.Scene {
   private explosionEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
   private vortexEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
 
+  // Mobile Controls
+  private isMobile: boolean = false;
+  private joystickBase: Phaser.GameObjects.Arc | null = null;
+  private joystickThumb: Phaser.GameObjects.Arc | null = null;
+  private joystickActive: boolean = false;
+  private joystickVector: Phaser.Math.Vector2 = new Phaser.Math.Vector2(0, 0);
+  private mobileButtons: Map<string, Phaser.GameObjects.Container> = new Map();
+
   // Black Hole Visuals
   private blackHoleContainer: Phaser.GameObjects.Container | null = null;
   private blackHoleTelegraph: Phaser.GameObjects.Graphics | null = null;
@@ -70,12 +81,19 @@ export class MainScene extends Phaser.Scene {
     this.hookRangeGraphics = this.add.graphics();
     this.hookRangeGraphics.setDepth(1);
 
+    // 1. Layer Setup (MUST BE FIRST)
+    this.worldLayer = this.add.container(0, 0);
+    this.uiLayer = this.add.container(0, 0);
+    this.uiLayer.setScrollFactor(0);
+    this.uiLayer.setDepth(10000);
+
     // 1. Generate ALL asset textures in-engine for perfect transparency
     this.generateVectorTextures();
 
     // 2. World & Grid
     this.physics.world.setBounds(0, 0, this.WORLD_SIZE, this.WORLD_SIZE);
     const graphics = this.add.graphics();
+    this.worldLayer.add(graphics);
     graphics.lineStyle(1, 0x222222, 1);
     for (let x = 0; x <= this.WORLD_SIZE; x += this.GRID_SIZE) {
       graphics.moveTo(x, 0);
@@ -88,7 +106,17 @@ export class MainScene extends Phaser.Scene {
     graphics.strokePath();
 
     // 3. Camera Setup
+    const { width, height } = this.scale;
     this.cameras.main.setBounds(0, 0, this.WORLD_SIZE, this.WORLD_SIZE);
+    
+    // UI Camera (Overlays the main camera)
+    this.uiCamera = this.cameras.add(0, 0, width, height);
+    this.uiCamera.setScroll(0, 0);
+    this.uiCamera.setName('UI');
+    
+    // STRICT ISOLATION: Cameras hide what they don't own
+    this.cameras.main.ignore(this.uiLayer);
+    this.uiCamera.ignore(this.worldLayer);
     // 4. Particles
     this.explosionEmitter = this.add.particles(0, 0, "spark", {
       speed: { min: 50, max: 150 },
@@ -114,16 +142,30 @@ export class MainScene extends Phaser.Scene {
     });
     this.vortexEmitter.setDepth(4);
 
-    // 5. Input Handling
+    // 4. Input Handling
+    this.isMobile = !this.sys.game.device.os.desktop || this.sys.game.device.input.touch;
     this.setupInputs();
-
-    // 6. Setup Listeners
-    this.setupNetworkListeners();
+    if (this.isMobile) {
+        this.createMobileControls();
+    }
 
     // 7. Setup Minimap
     this.setupMinimap();
+    
+    // 8. Assign UI to UI Layer
+    if (this.minimapContainer) {
+        this.uiLayer.add(this.minimapContainer);
+    }
+    
+    // worldLayer isolation
+    this.worldLayer.add([this.hookRangeGraphics, this.explosionEmitter, this.vortexEmitter]);
 
-    // 8. Join Game
+    // 6. Setup Listeners
+    this.setupNetworkListeners();
+    this.scale.on('resize', this.handleResize, this);
+    this.handleResize();
+
+    // 9. Join Game
     const { playerName, persistentId } = useGameStore.getState();
     this.networkManager.emit('joinGame', { userName: playerName, persistentId });
 
@@ -494,7 +536,7 @@ export class MainScene extends Phaser.Scene {
         let other = this.otherPlayers.get(id);
         if (!other) {
           // Spawn if not exists
-          other = new Player(this, id, info.x, info.y, "player_atlas", info.userName);
+          other = new Player(this, id, info.x, info.y, "player_atlas", info.userName, this.worldLayer);
           this.otherPlayers.set(id, other);
         }
 
@@ -663,6 +705,7 @@ export class MainScene extends Phaser.Scene {
       if (this.blackHoleTelegraph) this.blackHoleTelegraph.destroy();
       
       this.blackHoleTelegraph = this.add.graphics();
+      this.worldLayer.add(this.blackHoleTelegraph);
       this.blackHoleTelegraph.setDepth(1);
       
       // Animated expanding ring
@@ -691,6 +734,7 @@ export class MainScene extends Phaser.Scene {
       }
 
       this.blackHoleContainer = this.add.container(x, y);
+      this.worldLayer.add(this.blackHoleContainer);
       this.blackHoleContainer.setDepth(4);
 
       const spiral = this.add.sprite(0, 0, "vortex_spiral");
@@ -1004,6 +1048,7 @@ export class MainScene extends Phaser.Scene {
     bombSprite.setCollideWorldBounds(true);
     bombSprite.setBounce(0.8);
     this.bombs.add(bombSprite);
+    this.worldLayer.add(bombSprite);
 
     this.tweens.add({
         targets: bombSprite,
@@ -1103,6 +1148,7 @@ export class MainScene extends Phaser.Scene {
     color: number,
   ) {
     const circle = this.add.circle(x, y, 10, color, 0.4);
+    this.worldLayer.add(circle);
     this.tweens.add({
       targets: circle,
       radius,
@@ -1134,6 +1180,7 @@ export class MainScene extends Phaser.Scene {
       strokeThickness: 8,
     });
     t.setOrigin(0.5);
+    this.worldLayer.add(t);
     this.tweens.add({
       targets: t,
       y: y - 120,
@@ -1150,7 +1197,8 @@ export class MainScene extends Phaser.Scene {
       playerInfo.x,
       playerInfo.y,
       "mouse_pink",
-      playerInfo.userName || 'You'
+      playerInfo.userName || 'You',
+      this.worldLayer
     );
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
   }
@@ -1159,6 +1207,7 @@ export class MainScene extends Phaser.Scene {
     const itemSprite = this.physics.add.sprite(item.x, item.y, item.type);
     itemSprite.setDepth(1);
     itemSprite.setScale(0.5); // Global scale reduction for items
+    this.worldLayer.add(itemSprite);
     this.tweens.add({
       targets: itemSprite,
       y: item.y - 12,
@@ -1182,14 +1231,24 @@ export class MainScene extends Phaser.Scene {
       playerInfo.x,
       playerInfo.y,
       "mouse_azure",
-      playerInfo.userName || 'Player'
+      playerInfo.userName || 'Player',
+      this.worldLayer
     );
     this.otherPlayers.set(playerInfo.userId, otherPlayer);
   }
 
   update(time: number) {
     if (this.player && this.player.visible) {
-      this.player.update(this.input.activePointer, this.cameras.main);
+      if (this.isMobile && this.joystickActive) {
+          // Calculate world target based on joystick vector
+          const targetX = this.player.x + this.joystickVector.x * 200;
+          const targetY = this.player.y + this.joystickVector.y * 200;
+          const dummyPointer = { x: targetX, y: targetY } as any;
+          this.player.update(dummyPointer, this.cameras.main);
+      } else if (!this.isMobile) {
+          this.player.update(this.input.activePointer, this.cameras.main);
+      }
+      
       if (time - this.lastEmitTime > this.emitInterval) {
         this.networkManager.emit("playerMovement", this.player.getEntityData());
         this.lastEmitTime = time;
@@ -1311,5 +1370,193 @@ export class MainScene extends Phaser.Scene {
     if (this.player) {
         drawIndicator(this.player.x, this.player.y, 0xff00ff, 3, true);
     }
+  }
+
+  private handleResize() {
+    const { width, height } = this.scale;
+    
+    // Sync UI camera
+    if (this.uiCamera) {
+        this.uiCamera.setSize(width, height);
+        this.uiCamera.setViewport(0, 0, width, height);
+    }
+
+    // Set deterministic zoom for world
+    const baseWidth = 1280;
+    const baseHeight = 720;
+    const zoomX = width / baseWidth;
+    const zoomY = height / baseHeight;
+    const zoom = Math.min(zoomX, zoomY);
+    
+    this.cameras.main.setZoom(zoom);
+    this.cameras.main.setViewport(0, 0, width, height);
+
+    // Reposition minimap
+    if (this.minimapContainer) {
+        const size = 150;
+        const padding = 20;
+        this.minimapContainer.setPosition(padding + size/2, padding + size/2);
+    }
+
+    // Reposition Mobile Controls
+    if (this.isMobile) {
+        this.repositionMobileControls(width, height);
+    }
+  }
+
+  private createMobileControls() {
+    // 1. Initial Position (will be updated by handleResize)
+    const { width, height } = this.scale;
+    const joystickX = 220;
+    const joystickY = height - 220;
+    
+    // Joystick Base
+    this.joystickBase = this.add.circle(joystickX, joystickY, 90, 0xffffff, 0.1);
+    this.joystickBase.setStrokeStyle(4, 0xffffff, 0.3);
+    this.joystickBase.setScrollFactor(0);
+    this.joystickBase.setDepth(2000);
+    
+    // Joystick Thumb
+    this.joystickThumb = this.add.circle(joystickX, joystickY, 45, 0xffffff, 0.3);
+    this.joystickThumb.setStrokeStyle(2, 0xffffff, 0.5);
+    this.joystickThumb.setScrollFactor(0);
+    this.joystickThumb.setDepth(2001);
+    
+    // Listeners (Only added ONCE)
+    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+        if (!this.isMobile || !this.joystickBase) return;
+        const dist = Phaser.Math.Distance.Between(pointer.x, pointer.y, this.joystickBase.x, this.joystickBase.y);
+        if (dist < 140) {
+            this.joystickActive = true;
+            this.updateJoystick(pointer);
+        }
+    });
+
+    this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+        if (this.isMobile && this.joystickActive) {
+            this.updateJoystick(pointer);
+        }
+    });
+
+    this.input.on('pointerup', () => {
+        if (!this.isMobile) return;
+        this.joystickActive = false;
+        if (this.joystickThumb && this.joystickBase) {
+            this.joystickThumb.setPosition(this.joystickBase.x, this.joystickBase.y);
+        }
+        this.joystickVector.set(0, 0);
+    });
+
+    // Action Buttons
+    this.setupMobileButtons();
+    
+    // Assign mobile controls to UI Layer
+    if (this.joystickBase) this.uiLayer.add(this.joystickBase);
+    if (this.joystickThumb) this.uiLayer.add(this.joystickThumb);
+    this.mobileButtons.forEach(btn => this.uiLayer.add(btn));
+
+    // Initial reposition
+    this.repositionMobileControls(width, height);
+  }
+
+  private setupMobileButtons() {
+    // Just create placeholders, reposition will put them in the right spot
+    const attackBtn = this.createMobileButton(0, 0, "⚔️", 0xff00ff, 75, () => {
+        if (this.player && this.player.visible && !this.player.isStunned) this.performAttack();
+    });
+    this.mobileButtons.set('attack', attackBtn);
+
+    const turboBtn = this.createMobileButton(0, 0, "⚡", 0xffff00, 55, () => this.useTurbo());
+    this.mobileButtons.set('turbo', turboBtn);
+
+    const hookBtn = this.createMobileButton(0, 0, "🪝", 0x8888ff, 55, () => {
+        if (this.player && this.player.visible && !this.player.isStunned) {
+            const { hookCount } = useGameStore.getState();
+            if (hookCount > 0) {
+                if (!this.player.isAimingHook) this.player.setAimingHook(true, this.time.now);
+                else this.useHook();
+            }
+        }
+    });
+    this.mobileButtons.set('hook', hookBtn);
+
+    const itemBtn = this.createMobileButton(0, 0, "📦", 0xff4400, 55, () => {
+        const { inventory, selectedInventoryIndex } = useGameStore.getState();
+        const selectedItem = inventory[selectedInventoryIndex];
+        if (selectedItem === "bomb") this.throwBomb();
+        else if (selectedItem === "magnet") this.useMagnet();
+    });
+    this.mobileButtons.set('item', itemBtn);
+  }
+
+  private repositionMobileControls(width: number, height: number) {
+      // 1. Reposition Joystick (Fixed position relative to bottom-left)
+      const joystickX = 140;
+      const joystickY = height - 140;
+      if (this.joystickBase) this.joystickBase.setPosition(joystickX, joystickY);
+      if (this.joystickThumb) this.joystickThumb.setPosition(joystickX, joystickY);
+
+      // 2. Reposition Buttons (Fixed position relative to bottom-right)
+      const rightMargin = width - 120;
+      const bottomMargin = height - 120;
+
+      const attack = this.mobileButtons.get('attack');
+      if (attack) attack.setPosition(rightMargin, bottomMargin);
+
+      const turbo = this.mobileButtons.get('turbo');
+      if (turbo) turbo.setPosition(rightMargin - 140, bottomMargin);
+
+      const hook = this.mobileButtons.get('hook');
+      if (hook) hook.setPosition(rightMargin, bottomMargin - 140);
+
+      const item = this.mobileButtons.get('item');
+      if (item) item.setPosition(rightMargin - 140, bottomMargin - 140);
+  }
+
+  private updateJoystick(pointer: Phaser.Input.Pointer) {
+      if (!this.joystickBase || !this.joystickThumb) return;
+      
+      const joystickX = this.joystickBase.x;
+      const joystickY = this.joystickBase.y;
+      
+      const dist = Phaser.Math.Distance.Between(pointer.x, pointer.y, joystickX, joystickY);
+      const angle = Phaser.Math.Angle.Between(joystickX, joystickY, pointer.x, pointer.y);
+      
+      const maxDist = 70; // Slightly smaller range
+      const cappedDist = Math.min(dist, maxDist);
+      
+      const thumbX = joystickX + Math.cos(angle) * cappedDist;
+      const thumbY = joystickY + Math.sin(angle) * cappedDist;
+      
+      this.joystickThumb.setPosition(thumbX, thumbY);
+      
+      // Update vector (-1 to 1)
+      this.joystickVector.set(
+          Math.cos(angle) * (cappedDist / maxDist),
+          Math.sin(angle) * (cappedDist / maxDist)
+      );
+  }
+
+  private createMobileButton(x: number, y: number, icon: string, color: number, size: number, callback: () => void) {
+      const container = this.add.container(x, y);
+      container.setScrollFactor(0);
+      container.setDepth(3000);
+
+      const circle = this.add.circle(0, 0, size, color, 0.2);
+      circle.setStrokeStyle(4, color, 0.5);
+      
+      const text = this.add.text(0, 0, icon, { fontSize: `${size * 0.6}px` }).setOrigin(0.5);
+      
+      container.add([circle, text]);
+      
+      circle.setInteractive();
+      circle.on('pointerdown', () => {
+          container.setScale(0.9);
+          callback();
+      });
+      circle.on('pointerup', () => container.setScale(1));
+      circle.on('pointerout', () => container.setScale(1));
+      
+      return container;
   }
 }
