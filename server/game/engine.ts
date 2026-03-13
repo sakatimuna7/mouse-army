@@ -56,6 +56,7 @@ export class GameEngine {
   private readonly TICK_RATE = 20;
   private readonly TICK_MS = 1000 / 20;
   private readonly AOI_RADIUS = 600;
+  private readonly MAX_BOTS = 4;
   private onPlayerDeath?: (persistentId: string) => void;
   
   private tickInterval: any;
@@ -547,8 +548,8 @@ export class GameEngine {
 
   private startBotSpawnLoop() {
     setInterval(() => {
-      const currentTotal = Object.keys(this.players).length;
-      if (currentTotal < 20) {
+      const currentBots = Object.values(this.players).filter(p => p.isBot).length;
+      if (currentBots < this.MAX_BOTS) {
         this.spawnBot();
       }
     }, 5000);

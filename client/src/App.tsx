@@ -48,30 +48,32 @@ function App() {
         className="exit-btn"
         onClick={() => useGameStore.getState().setJoined(false)}
       >
-        <span>EXIT ROOM</span>
+        <div className="exit-icon">↩</div>
+        <span>LEAVE MATCH</span>
       </button>
 
       <style>{`
         .exit-btn {
           position: absolute;
           top: 20px;
-          right: 20px;
+          left: 20px;
           background: rgba(255, 30, 30, 0.1);
-          border: 1px solid rgba(255, 30, 30, 0.3);
+          border: 1px solid rgba(255, 30, 30, 0.2);
           color: #ff4444;
           padding: 8px 16px;
-          border-radius: 8px;
+          border-radius: 12px;
           font-family: 'Outfit', sans-serif;
-          font-size: 12px;
+          font-size: 11px;
           font-weight: 800;
           letter-spacing: 1px;
           cursor: pointer;
           transition: all 0.3s ease;
-          backdrop-filter: blur(10px);
+          backdrop-filter: blur(15px);
           z-index: 2000;
           display: flex;
           align-items: center;
           gap: 8px;
+          text-transform: uppercase;
         }
 
         .exit-btn:hover {
@@ -81,49 +83,59 @@ function App() {
           transform: translateY(-2px);
         }
 
-        .exit-btn:active {
-          transform: translateY(0);
+        .exit-icon {
+          font-size: 14px;
+        }
+
+        @media (max-width: 768px) {
+          .exit-btn {
+            top: 10px;
+            left: 10px;
+            padding: 6px 12px;
+            font-size: 9px;
+          }
         }
 
         .anomaly-warning {
-          background: rgba(255, 0, 0, 0.1);
-          border: 2px solid #ff4444;
-          padding: 24px 48px;
-          border-radius: 4px;
+          background: rgba(20, 0, 0, 0.4);
+          border: 1px solid rgba(255, 0, 0, 0.3);
+          padding: 32px 64px;
+          border-radius: 24px;
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 12px;
-          backdrop-filter: blur(20px);
-          animation: warningPulse 0.5s infinite alternate ease-in-out, warningEntry 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-          box-shadow: 0 0 50px rgba(255, 0, 0, 0.2), inset 0 0 20px rgba(255, 0, 0, 0.1);
+          gap: 16px;
+          backdrop-filter: blur(40px);
+          animation: warningPulse 1s infinite alternate ease-in-out, warningEntry 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+          box-shadow: 0 40px 100px rgba(255, 0, 0, 0.1);
           position: relative;
           overflow: hidden;
         }
 
         @keyframes warningEntry {
-          0% { transform: scale(0.8) translateY(20px); opacity: 0; }
+          0% { transform: scale(0.9) translateY(40px); opacity: 0; }
           100% { transform: scale(1) translateY(0); opacity: 1; }
         }
 
         @keyframes warningPulse {
-          0% { border-color: #ff4444; box-shadow: 0 0 30px rgba(255, 0, 0, 0.2); }
-          100% { border-color: #ffffff; box-shadow: 0 0 60px rgba(255, 0, 0, 0.4); }
+          0% { border-color: rgba(255, 68, 68, 0.3); box-shadow: 0 0 40px rgba(255, 0, 0, 0.1); }
+          100% { border-color: rgba(255, 68, 68, 0.8); box-shadow: 0 0 80px rgba(255, 0, 0, 0.3); }
         }
 
         .anomaly-icon {
           font-size: 48px;
           color: #ff4444;
-          filter: drop-shadow(0 0 10px #ff4444);
+          filter: drop-shadow(0 0 20px #ff4444);
         }
 
         .anomaly-text {
           font-family: 'Outfit', sans-serif;
-          font-size: 24px;
+          font-size: 20px;
           font-weight: 900;
           color: #ffffff;
-          letter-spacing: 4px;
-          text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+          letter-spacing: 2px;
+          text-align: center;
+          text-transform: uppercase;
         }
 
         .anomaly-scanner {
@@ -132,8 +144,8 @@ function App() {
           left: -100%;
           width: 50%;
           height: 100%;
-          background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-          animation: scanning 2s infinite linear;
+          background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+          animation: scanning 3s infinite linear;
         }
 
         @keyframes scanning {

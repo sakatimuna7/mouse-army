@@ -1,119 +1,184 @@
 import React from 'react';
 import { useGameStore, ILeaderboardEntry } from '../../../store/useGameStore';
+import { Trophy, Medal, User } from 'lucide-react';
 
 export const Leaderboard: React.FC = () => {
     const { leaderboard } = useGameStore();
 
     return (
-        <div className="leaderboard-container">
-            <h2 className="leaderboard-title">Leaderboard</h2>
+        <div className="leaderboard-wrapper">
+            <div className="leaderboard-header">
+                <Trophy size={18} className="text-secondary" />
+                <h2 className="leaderboard-title">LEADERBOARD</h2>
+            </div>
+            
             <div className="leaderboard-list">
-                {leaderboard.map((entry: ILeaderboardEntry, index: number) => (
-                    <div 
-                        key={entry.userId} 
-                        className={`leaderboard-item ${entry.isLocalPlayer ? 'local-player' : ''}`}
-                    >
-                        <span className="rank">#{index + 1}</span>
-                        <span className="flex-1 font-bold text-white truncate">
-                            {entry.userName || `Guest-${entry.userId.substring(0, 5)}`}
-                            {entry.isLocalPlayer && <span className="ml-2 text-[10px] text-pink-500">(YOU)</span>}
-                        </span>
-                        <span className="score">{entry.score} pts</span>
-                    </div>
-                ))}
+                {leaderboard.slice(0, 10).map((entry: ILeaderboardEntry, index: number) => {
+                    const isTop3 = index < 3;
+                    return (
+                        <div 
+                            key={entry.userId} 
+                            className={`leaderboard-item ${entry.isLocalPlayer ? 'local-player' : ''} ${isTop3 ? 'top-rank' : ''}`}
+                        >
+                            <div className="rank-badge">
+                                {index === 0 ? <Medal size={14} color="#FFD700" /> : 
+                                 index === 1 ? <Medal size={14} color="#C0C0C0" /> :
+                                 index === 2 ? <Medal size={14} color="#CD7F32" /> :
+                                 <span className="rank-num">{index + 1}</span>}
+                            </div>
+                            
+                            <div className="player-info">
+                                <span className="username">
+                                    {entry.userName || `Guest-${entry.userId.substring(0, 5)}`}
+                                    {entry.isLocalPlayer && <span className="you-tag">YOU</span>}
+                                </span>
+                                <span className="score">{entry.score.toLocaleString()}</span>
+                            </div>
+                        </div>
+                    );
+                })}
             </div>
 
             <style>{`
-                .leaderboard-container {
+                .leaderboard-wrapper {
                     position: absolute;
                     top: 20px;
                     right: 20px;
-                    width: 280px;
-                    background: rgba(15, 15, 15, 0.85);
-                    backdrop-filter: blur(12px);
-                    border: 1px solid rgba(255, 255, 255, 0.1);
-                    border-radius: 16px;
-                    padding: 20px;
+                    width: 240px;
+                    background: rgba(10, 10, 12, 0.6);
+                    backdrop-filter: blur(20px);
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    border-radius: 20px;
+                    padding: 16px;
                     color: white;
-                    font-family: 'Inter', system-ui, -apple-system, sans-serif;
-                    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+                    font-family: 'Outfit', sans-serif;
+                    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
                     user-select: none;
                     pointer-events: auto;
                     z-index: 1000;
-                    animation: slideIn 0.5s ease-out;
+                    animation: slideInRight 0.6s cubic-bezier(0.16, 1, 0.3, 1);
                 }
 
-                @keyframes slideIn {
-                    from { transform: translateX(100px); opacity: 0; }
+                @keyframes slideInRight {
+                    from { transform: translateX(50px); opacity: 0; }
                     to { transform: translateX(0); opacity: 1; }
                 }
 
+                .leaderboard-header {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    margin-bottom: 16px;
+                    padding-bottom: 12px;
+                    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+                }
+
                 .leaderboard-title {
-                    margin: 0 0 16px 0;
-                    font-size: 1.2rem;
-                    font-weight: 700;
-                    text-transform: uppercase;
-                    letter-spacing: 1px;
-                    background: linear-gradient(90deg, #ff00ff, #00ffff);
-                    -webkit-background-clip: text;
-                    -webkit-text-fill-color: transparent;
-                    border-bottom: 2px solid rgba(255, 255, 255, 0.05);
-                    padding-bottom: 10px;
+                    margin: 0;
+                    font-size: 0.8rem;
+                    font-weight: 800;
+                    letter-spacing: 2px;
+                    color: rgba(255, 255, 255, 0.6);
                 }
 
                 .leaderboard-list {
                     display: flex;
                     flex-direction: column;
-                    gap: 8px;
+                    gap: 6px;
                 }
 
                 .leaderboard-item {
                     display: flex;
                     align-items: center;
-                    padding: 10px 14px;
-                    background: rgba(255, 255, 255, 0.03);
-                    border-radius: 10px;
-                    transition: all 0.2s ease;
+                    gap: 12px;
+                    padding: 8px 10px;
+                    background: rgba(255, 255, 255, 0.02);
                     border: 1px solid transparent;
-                }
-
-                .leaderboard-item:hover {
-                    background: rgba(255, 255, 255, 0.08);
-                    transform: scale(1.02);
+                    border-radius: 12px;
+                    transition: all 0.3s ease;
                 }
 
                 .leaderboard-item.local-player {
                     background: rgba(255, 0, 255, 0.1);
-                    border: 1px solid rgba(255, 0, 255, 0.3);
+                    border-color: rgba(255, 0, 255, 0.2);
                 }
 
-                .rank {
+                .leaderboard-item.top-rank {
+                    background: rgba(255, 255, 255, 0.04);
+                }
+
+                .rank-badge {
+                    width: 24px;
+                    height: 24px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background: rgba(0, 0, 0, 0.3);
+                    border-radius: 6px;
+                }
+
+                .rank-num {
+                    font-size: 0.75rem;
                     font-weight: 800;
                     color: rgba(255, 255, 255, 0.4);
-                    margin-right: 12px;
-                    width: 30px;
+                }
+
+                .player-info {
+                    flex: 1;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    min-width: 0;
                 }
 
                 .username {
-                    flex: 1;
-                    font-weight: 500;
+                    font-size: 0.85rem;
+                    font-weight: 600;
                     white-space: nowrap;
                     overflow: hidden;
                     text-overflow: ellipsis;
+                    margin-right: 8px;
+                }
+
+                .you-tag {
+                    font-size: 9px;
+                    font-weight: 900;
+                    padding: 1px 4px;
+                    background: #ff00ff;
+                    color: white;
+                    border-radius: 4px;
+                    margin-left: 6px;
                 }
 
                 .score {
-                    font-weight: 700;
+                    font-size: 0.85rem;
+                    font-weight: 800;
                     color: #00ffff;
                 }
 
-                .leaderboard-item.local-player .score {
+                .local-player .score {
                     color: #ff00ff;
                 }
 
-                .leaderboard-item:nth-child(1) .rank { color: #ffd700; } /* Gold */
-                .leaderboard-item:nth-child(2) .rank { color: #c0c0c0; } /* Silver */
-                .leaderboard-item:nth-child(3) .rank { color: #cd7f32; } /* Bronze */
+                /* Mobile Support */
+                @media (max-width: 768px) {
+                    .leaderboard-wrapper {
+                        width: 180px;
+                        top: 10px;
+                        right: 10px;
+                        padding: 12px;
+                    }
+                    .leaderboard-header {
+                        margin-bottom: 10px;
+                        padding-bottom: 8px;
+                    }
+                    .username {
+                        font-size: 0.75rem;
+                    }
+                    .score {
+                        font-size: 0.75rem;
+                    }
+                }
             `}</style>
         </div>
     );

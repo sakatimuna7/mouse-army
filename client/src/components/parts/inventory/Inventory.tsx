@@ -1,16 +1,20 @@
 import React from 'react';
 import { useGameStore } from '../../../store/useGameStore';
+import { Zap, Anchor, Box, MousePointer2, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const TurboIndicator: React.FC = () => {
     const { turboCount } = useGameStore();
     return (
-        <div className="turbo-wrap">
-            <span className="turbo-label">TURBO [Q]</span>
-            <div className="turbo-charges">
+        <div className="ability-wrap">
+            <div className="ability-label">
+                <Zap size={10} className="text-yellow-400" />
+                <span>TURBO [Q]</span>
+            </div>
+            <div className="charge-dots">
                 {[...Array(3)].map((_, i) => (
                     <div 
                         key={i} 
-                        className={`turbo-charge ${i < turboCount ? 'active' : ''}`}
+                        className={`charge-dot turbo ${i < turboCount ? 'active' : ''}`}
                     />
                 ))}
             </div>
@@ -21,12 +25,13 @@ const TurboIndicator: React.FC = () => {
 const HookIndicator: React.FC = () => {
     const { hookCount } = useGameStore();
     return (
-        <div className="hook-wrap">
-            <span className="hook-label">HOOK [E]</span>
-            <div className="hook-charges">
-                <div className={`hook-charge ${hookCount > 0 ? 'active' : ''}`}>
-                    🪝
-                </div>
+        <div className="ability-wrap">
+            <div className="ability-label">
+                <Anchor size={10} className="text-blue-400" />
+                <span>HOOK [E]</span>
+            </div>
+            <div className={`hook-status ${hookCount > 0 ? 'active' : ''}`}>
+                <Anchor size={16} />
             </div>
         </div>
     );
@@ -35,40 +40,47 @@ const HookIndicator: React.FC = () => {
 export const Inventory: React.FC = () => {
     const { inventory, selectedInventoryIndex } = useGameStore();
 
-    // Filter to only show relevant items
-    const displayItems = inventory;
-
     return (
-        <div className="inventory-outer">
-            <div className="inventory-track">
-                {Array.from({ length: 5 }).map((_, index) => {
-                    const item = displayItems[index];
-                    const isSelected = index === selectedInventoryIndex;
-                    
-                    return (
-                        <div 
-                            key={index} 
-                            className={`inventory-slot ${item || 'empty'} ${isSelected ? 'selected' : ''}`}
-                        >
-                            {item && (
-                                <div className="item-icon">
-                                    {item === 'bomb' ? '💣' : '🧲'}
-                                </div>
-                            )}
-                            {isSelected && <div className="selection-indicator">A [ ← ] D</div>}
-                        </div>
-                    );
-                })}
+        <div className="hud-bottom">
+            <div className="inventory-container">
+                <div className="inventory-grid">
+                    {Array.from({ length: 5 }).map((_, index) => {
+                        const item = inventory[index];
+                        const isSelected = index === selectedInventoryIndex;
+                        
+                        return (
+                            <div 
+                                key={index} 
+                                className={`inventory-slot ${item || 'empty'} ${isSelected ? 'selected' : ''}`}
+                                onClick={() => useGameStore.getState().setInventoryIndex(index)}
+                            >
+                                <div className="slot-num">{index + 1}</div>
+                                {item && (
+                                    <div className="item-icon">
+                                        {item === 'bomb' ? '💣' : '🧲'}
+                                    </div>
+                                )}
+                                {isSelected && (
+                                    <div className="item-controls">
+                                        <ChevronLeft size={10} />
+                                        <span>AD</span>
+                                        <ChevronRight size={10} />
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+
+                <div className="abilities-section">
+                    <TurboIndicator />
+                    <div className="divider" />
+                    <HookIndicator />
+                </div>
             </div>
 
-            {/* Turbo Stack Indicator */}
-            <TurboIndicator />
-
-            {/* Hook Indicator */}
-            <HookIndicator />
-
             <style>{`
-                .inventory-outer {
+                .hud-bottom {
                     position: absolute;
                     bottom: 30px;
                     left: 50%;
@@ -77,164 +89,167 @@ export const Inventory: React.FC = () => {
                     pointer-events: none;
                 }
 
-                .inventory-track {
+                .inventory-container {
                     display: flex;
-                    gap: 12px;
-                    background: rgba(15, 15, 15, 0.7);
+                    flex-direction: column;
+                    align-items: center;
+                    gap: 16px;
+                    pointer-events: auto;
+                }
+
+                .inventory-grid {
+                    display: flex;
+                    gap: 10px;
+                    background: rgba(10, 10, 12, 0.6);
                     backdrop-filter: blur(25px);
-                    padding: 12px;
-                    border-radius: 18px;
+                    padding: 10px;
+                    border-radius: 20px;
                     border: 1px solid rgba(255, 255, 255, 0.08);
-                    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 
-                                inset 0 0 20px rgba(255, 255, 255, 0.02);
+                    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
                 }
 
                 .inventory-slot {
-                    width: 54px;
-                    height: 54px;
-                    background: rgba(255, 255, 255, 0.02);
+                    width: 50px;
+                    height: 50px;
+                    background: rgba(255, 255, 255, 0.03);
                     border: 1px solid rgba(255, 255, 255, 0.05);
-                    border-radius: 12px;
+                    border-radius: 14px;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+                    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
                     position: relative;
+                    cursor: pointer;
                 }
 
-                .inventory-slot.empty {
-                   opacity: 0.2;
+                .slot-num {
+                    position: absolute;
+                    top: 4px;
+                    left: 6px;
+                    font-size: 8px;
+                    font-weight: 900;
+                    color: rgba(255, 255, 255, 0.2);
+                    font-family: 'Outfit', sans-serif;
                 }
 
                 .inventory-slot.selected {
-                    background: rgba(255, 255, 255, 0.08);
-                    border-color: rgba(255, 255, 255, 0.4);
-                    box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
-                    transform: scale(1.1) translateY(-5px);
-                }
-
-                .inventory-slot.bomb.selected {
-                    border-color: #ff4400;
-                    box-shadow: 0 0 25px rgba(255, 68, 0, 0.3);
-                }
-
-                .inventory-slot.magnet.selected {
-                    border-color: #ff00ff;
-                    box-shadow: 0 0 25px rgba(255, 0, 255, 0.3);
-                }
-
-                .selection-indicator {
-                    position: absolute;
-                    top: -22px;
-                    font-size: 8px;
-                    font-weight: 800;
-                    color: white;
-                    white-space: nowrap;
-                    background: rgba(0, 0, 0, 0.6);
-                    padding: 2px 6px;
-                    border-radius: 4px;
-                    letter-spacing: 1px;
-                }
-
-                .inventory-slot:not(.empty) {
-                    animation: slotPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-                }
-
-                @keyframes slotPop {
-                    0% { transform: scale(0.6); opacity: 0; }
-                    100% { transform: scale(1); opacity: 1; }
+                    background: rgba(255, 255, 255, 0.1);
+                    border-color: rgba(0, 255, 255, 0.5);
+                    box-shadow: 0 0 20px rgba(0, 255, 255, 0.15);
+                    transform: scale(1.1) translateY(-8px);
                 }
 
                 .item-icon {
-                    font-size: 1.8rem;
-                    filter: drop-shadow(0 0 8px rgba(255,255,255,0.2));
+                    font-size: 1.6rem;
+                    filter: drop-shadow(0 0 10px rgba(255,255,255,0.2));
+                    animation: itemPop 0.4s cubic-bezier(0.16, 1, 0.3, 1);
                 }
 
-                .turbo-wrap {
+                @keyframes itemPop {
+                    0% { transform: scale(0.5); opacity: 0; }
+                    100% { transform: scale(1); opacity: 1; }
+                }
+
+                .item-controls {
                     position: absolute;
-                    left: calc(100% + 15px);
-                    bottom: 0;
+                    bottom: -18px;
+                    display: flex;
+                    align-items: center;
+                    gap: 2px;
+                    font-size: 8px;
+                    font-weight: 900;
+                    color: #00ffff;
+                    letter-spacing: 1px;
+                }
+
+                .abilities-section {
+                    display: flex;
+                    align-items: center;
+                    gap: 16px;
+                    background: rgba(10, 10, 12, 0.4);
+                    backdrop-filter: blur(10px);
+                    padding: 8px 16px;
+                    border-radius: 100px;
+                    border: 1px solid rgba(255, 255, 255, 0.05);
+                }
+
+                .divider {
+                    width: 1px;
+                    height: 16px;
+                    background: rgba(255, 255, 255, 0.1);
+                }
+
+                .ability-wrap {
                     display: flex;
                     flex-direction: column;
                     align-items: center;
-                    gap: 6px;
+                    gap: 4px;
                 }
 
-                .turbo-label {
-                    color: rgba(255, 255, 0, 0.7);
-                    font-size: 9px;
-                    font-weight: 900;
+                .ability-label {
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+                    font-size: 8px;
+                    font-weight: 800;
+                    color: rgba(255, 255, 255, 0.4);
                     letter-spacing: 1px;
-                    text-shadow: 0 0 10px rgba(255, 255, 0, 0.3);
+                    font-family: 'Outfit', sans-serif;
                 }
 
-                .turbo-charges {
+                .charge-dots {
                     display: flex;
                     gap: 4px;
-                    background: rgba(0, 0, 0, 0.4);
-                    padding: 6px;
-                    border-radius: 8px;
-                    border: 1px solid rgba(255, 255, 0, 0.2);
                 }
 
-                .turbo-charge {
-                    width: 12px;
-                    height: 18px;
-                    background: rgba(255, 255, 255, 0.05);
-                    border-radius: 3px;
-                    transition: all 0.2s ease;
+                .charge-dot {
+                    width: 14px;
+                    height: 4px;
+                    background: rgba(255, 255, 255, 0.1);
+                    border-radius: 2px;
+                    transition: all 0.3s;
                 }
 
-                .turbo-charge.active {
+                .charge-dot.turbo.active {
                     background: #ffff00;
-                    box-shadow: 0 0 15px #ffff00, inset 0 0 8px rgba(255,255,255,0.8);
-                    transform: scale(1.1);
+                    box-shadow: 0 0 10px rgba(255, 255, 0, 0.5);
                 }
 
-                .hook-wrap {
-                    position: absolute;
-                    left: calc(100% + 85px);
-                    bottom: 0;
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                    gap: 6px;
-                }
-
-                .hook-label {
-                    color: rgba(136, 136, 255, 0.7);
-                    font-size: 9px;
-                    font-weight: 900;
-                    letter-spacing: 1px;
-                    text-shadow: 0 0 10px rgba(136, 136, 255, 0.3);
-                }
-
-                .hook-charges {
-                    background: rgba(0, 0, 0, 0.4);
-                    padding: 6px;
-                    border-radius: 8px;
-                    border: 1px solid rgba(136, 136, 255, 0.2);
-                }
-
-                .hook-charge {
-                    width: 32px;
-                    height: 32px;
-                    background: rgba(255, 255, 255, 0.05);
-                    border-radius: 6px;
+                .hook-status {
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    font-size: 1.2rem;
-                    transition: all 0.3s ease;
-                    opacity: 0.3;
+                    width: 24px;
+                    height: 24px;
+                    background: rgba(255, 255, 255, 0.05);
+                    border-radius: 6px;
+                    color: rgba(255, 255, 255, 0.2);
+                    transition: all 0.3s;
                 }
 
-                .hook-charge.active {
-                    background: rgba(136, 136, 255, 0.2);
-                    border: 1px solid #8888ff;
-                    opacity: 1;
-                    box-shadow: 0 0 15px rgba(136, 136, 255, 0.4);
-                    transform: scale(1.05);
+                .hook-status.active {
+                    background: rgba(0, 255, 255, 0.1);
+                    color: #00ffff;
+                    box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+                }
+
+                /* Mobile Support */
+                @media (max-width: 640px) {
+                    .hud-bottom {
+                        bottom: 20px;
+                        width: 90%;
+                    }
+                    .inventory-grid {
+                        gap: 8px;
+                        padding: 8px;
+                    }
+                    .inventory-slot {
+                        width: 44px;
+                        height: 44px;
+                    }
+                    .item-icon {
+                        font-size: 1.3rem;
+                    }
                 }
             `}</style>
         </div>
