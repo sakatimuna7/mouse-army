@@ -1,14 +1,8 @@
 import Phaser from "phaser";
 import { Player } from "./player";
-import { NetworkManager, IPlayerData } from "../network/networkManager";
+import { NetworkManager } from "../network/networkManager";
+import { IPlayerData, IItemData } from "@mouse-army/shared";
 import { useGameStore } from "../store/useGameStore";
-
-interface IItemData {
-  itemId: string;
-  type: "bomb" | "speed" | "hook";
-  x: number;
-  y: number;
-}
 
 interface IBombData {
   bombId: string;

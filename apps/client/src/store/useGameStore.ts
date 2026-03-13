@@ -1,18 +1,5 @@
 import { create } from 'zustand';
-
-export interface ILeaderboardEntry {
-    userId: string;
-    userName: string;
-    score: number;
-    isLocalPlayer?: boolean;
-}
-
-export interface IKillLog {
-    id: string;
-    killerName: string;
-    victimName: string;
-    timestamp: number;
-}
+import { ILeaderboardEntry, IKillLog } from '@mouse-army/shared';
 
 interface IGameStore {
     leaderboard: ILeaderboardEntry[];

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { useGameStore, IKillLog } from '../../../store/useGameStore';
+import { useGameStore } from '../../../store/useGameStore';
+import { IKillLog } from '@mouse-army/shared';
 import { Target } from 'lucide-react';
 
 const KillFeedItem: React.FC<{ log: IKillLog }> = ({ log }) => {

@@ -4,6 +4,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "bun --watch network/index.ts",
+    "build": "tsc",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -24,6 +25,7 @@
     "@types/socket.io-client": "^1.4.36",
     "cors": "^2.8.6",
     "express": "^5.2.1",
+    "@mouse-army/shared": "*",
     "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.3",
     "uuid": "^13.0.0"

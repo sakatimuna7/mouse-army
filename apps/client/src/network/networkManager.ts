@@ -1,18 +1,13 @@
 import { io, Socket } from 'socket.io-client';
-
-export interface IPlayerData {
-    userId: string;
-    x: number;
-    y: number;
-}
+import { IPlayerData } from '@mouse-army/shared';
 
 export class NetworkManager {
     private socket: Socket;
     private static instance: NetworkManager;
 
     private constructor() {
-        const host = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
-        this.socket = io(`http://${host}:3001`);
+        const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+        this.socket = io(serverUrl);
     }
 
     public static getInstance(): NetworkManager {

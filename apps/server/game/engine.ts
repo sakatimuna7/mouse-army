@@ -2,53 +2,16 @@ import { Server, Socket } from "socket.io";
 import { v4 as uuidv4 } from "uuid";
 import { QuadTree, IQuadEntity, IRect } from "./quadtree.js";
 import { BOT_NAMES } from "./bot-names.js";
+import { IPlayerData, IItemData, BlackHoleState, IBlackHole } from "@mouse-army/shared";
 
-interface IPlayerData extends IQuadEntity {
-  userId: string;
-  userName: string;
-  x: number;
-  y: number;
-  health: number;
-  score: number;
-  isDead: boolean;
-  isStunned: boolean;
-  spawnTime: number;
-  persistentId: string;
-  isBot?: boolean;
-  botType?: "Hunter" | "Scavenger" | "Wanderer";
-  targetId?: string;
-  inventory: string[];
-  turboCount: number;
-  hookCount: number;
-  lastActionTime?: number;
-}
-
-interface IItemData extends IQuadEntity {
-  itemId: string;
-  type: "bomb" | "speed" | "hook" | "magnet";
-  x: number;
-  y: number;
-}
-
-enum BlackHoleState {
-  None,
-  Warning,
-  Active,
-  Collapse
-}
-
-interface IBlackHole {
-  x: number;
-  y: number;
-  state: BlackHoleState;
-  startTime: number;
-}
+interface IPlayerEntity extends IPlayerData, IQuadEntity {}
+interface IItemEntity extends IItemData, IQuadEntity {}
 
 export class GameEngine {
   private io: Server;
   private roomId: string;
-  private players: Record<string, IPlayerData> = {};
-  private items: Record<string, IItemData> = {};
+  private players: Record<string, IPlayerEntity> = {};
+  private items: Record<string, IItemEntity> = {};
   private quadTree: QuadTree<IQuadEntity>;
   
   private readonly WORLD_SIZE = 5000;

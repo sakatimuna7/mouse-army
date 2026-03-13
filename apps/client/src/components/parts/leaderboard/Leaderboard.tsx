@@ -1,5 +1,6 @@
 import React from 'react';
-import { useGameStore, ILeaderboardEntry } from '../../../store/useGameStore';
+import { useGameStore } from '../../../store/useGameStore';
+import { ILeaderboardEntry } from '@mouse-army/shared';
 import { Trophy, Medal, User } from 'lucide-react';
 
 export const Leaderboard: React.FC = () => {

@@ -5,12 +5,19 @@ import cors from "cors";
 import { RoomManager } from "../room/room-manager.js";
 
 const app = express();
-app.use(cors());
+
+const NODE_ENV = process.env.NODE_ENV || 'development';
+const PORT = process.env.PORT || 3001;
+const ALLOWED_ORIGIN = NODE_ENV === 'development' ? '*' : (process.env.ALLOWED_ORIGIN || '');
+
+app.use(cors({
+  origin: ALLOWED_ORIGIN
+}));
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: "*",
+    origin: ALLOWED_ORIGIN,
     methods: ["GET", "POST"],
   },
 });
@@ -74,8 +81,7 @@ io.on("connection", (socket) => {
   });
 });
 
-const PORT = 3001;
 httpServer.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+  console.log(`Server is running on port ${PORT} in ${NODE_ENV} mode`);
 });
 
