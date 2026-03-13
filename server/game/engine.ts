@@ -25,7 +25,7 @@ interface IPlayerData extends IQuadEntity {
 
 interface IItemData extends IQuadEntity {
   itemId: string;
-  type: "bomb" | "speed" | "hook";
+  type: "bomb" | "speed" | "hook" | "magnet";
   x: number;
   y: number;
 }
@@ -119,7 +119,7 @@ export class GameEngine {
   private startItemSpawnLoop() {
     this.itemInterval = setInterval(() => {
       if (Object.keys(this.items).length < this.MAX_ITEMS) {
-        const types: ("bomb" | "speed" | "hook")[] = ["bomb", "speed", "hook"];
+        const types: ("bomb" | "speed" | "hook" | "magnet")[] = ["bomb", "speed", "hook", "magnet"];
         const newItem: IItemData = {
           id: uuidv4(),
           itemId: "", // Keeping for backward compatibility if needed, but 'id' is used by QuadTree
@@ -361,10 +361,10 @@ export class GameEngine {
       }
 
       // DROP LOGIC
-      const dropItems: ("bomb" | "speed" | "hook")[] = [];
-      // 1. Drop bombs
+      const dropItems: ("bomb" | "speed" | "hook" | "magnet")[] = [];
+      // 1. Drop bombs and magnets
       victim.inventory.forEach(type => {
-        if (type === "bomb") dropItems.push("bomb");
+        if (type === "bomb" || type === "magnet") dropItems.push(type);
       });
       // 2. Drop turbos
       for (let i = 0; i < victim.turboCount; i++) dropItems.push("speed");
@@ -433,9 +433,9 @@ export class GameEngine {
           player.hookCount++;
           canPickup = true;
         }
-      } else if (itemType === "bomb") {
+      } else if (itemType === "bomb" || itemType === "magnet") {
         if (player.inventory.length < 5) {
-          player.inventory.push("bomb");
+          player.inventory.push(itemType);
           canPickup = true;
         }
       }
@@ -464,6 +464,53 @@ export class GameEngine {
     if (player && player.hookCount > 0) {
       player.hookCount--;
       console.log(`Player ${player.userName} used Hook. Remaining: ${player.hookCount}`);
+    }
+  }
+
+  handleMagnet(socketId: string, data: { x: number, y: number }) {
+    const player = this.players[socketId];
+    if (player && player.inventory.includes("magnet")) {
+      const index = player.inventory.indexOf("magnet");
+      player.inventory.splice(index, 1);
+
+      // Notify clients to play visual effect
+      this.io.to(this.roomId).emit("magnetActivated", {
+        attractorId: socketId,
+        x: data.x,
+        y: data.y,
+        radius: 250
+      });
+
+      // Server-side attraction logic
+      const radius = 250;
+      const attractionForce = 15;
+
+      Object.values(this.players).forEach(victim => {
+        if (victim.userId === socketId || victim.isDead) return;
+
+        const dist = Math.sqrt(Math.pow(victim.x - data.x, 2) + Math.pow(victim.y - data.y, 2));
+        if (dist < radius) {
+          // Calculate vector towards attractor
+          const angle = Math.atan2(data.y - victim.y, data.x - victim.x);
+          
+          // Move victim towards attractor
+          // For bots, we can update their position directly
+          // For players, the actual movement is client-side, but server-side validation might catch up
+          // We'll emit a "pushed" event to force client-side displacement
+          if (victim.isBot) {
+              victim.x += Math.cos(angle) * attractionForce;
+              victim.y += Math.sin(angle) * attractionForce;
+          } else {
+              const socket = this.io.sockets.sockets.get(victim.userId);
+              if (socket) {
+                  socket.emit("playerPushed", {
+                      forceX: Math.cos(angle) * attractionForce,
+                      forceY: Math.sin(angle) * attractionForce
+                  });
+              }
+          }
+        }
+      });
     }
   }
 

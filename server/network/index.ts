@@ -62,6 +62,10 @@ io.on("connection", (socket) => {
     socket.on("useHook", () => {
       room.engine.handleUseHook(socket.id);
     });
+
+    socket.on("useMagnet", (data: { x: number, y: number }) => {
+      room.engine.handleMagnet(socket.id, data);
+    });
   });
 
   socket.on("disconnect", () => {

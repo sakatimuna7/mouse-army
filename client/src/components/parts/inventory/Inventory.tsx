@@ -33,26 +33,32 @@ const HookIndicator: React.FC = () => {
 };
 
 export const Inventory: React.FC = () => {
-    const { inventory } = useGameStore();
+    const { inventory, selectedInventoryIndex } = useGameStore();
 
-    // Filter to only show relevant items as per requirement
-    const displayItems = inventory.filter(item => item === 'bomb');
+    // Filter to only show relevant items
+    const displayItems = inventory;
 
     return (
         <div className="inventory-outer">
             <div className="inventory-track">
-                {displayItems.map((item, index) => (
-                    <div key={`${item}-${index}`} className={`inventory-slot ${item}`}>
-                        <div className="item-icon">
-                            {item === 'bomb' ? '💣' : '🪝'}
+                {Array.from({ length: 5 }).map((_, index) => {
+                    const item = displayItems[index];
+                    const isSelected = index === selectedInventoryIndex;
+                    
+                    return (
+                        <div 
+                            key={index} 
+                            className={`inventory-slot ${item || 'empty'} ${isSelected ? 'selected' : ''}`}
+                        >
+                            {item && (
+                                <div className="item-icon">
+                                    {item === 'bomb' ? '💣' : '🧲'}
+                                </div>
+                            )}
+                            {isSelected && <div className="selection-indicator">A [ ← ] D</div>}
                         </div>
-                    </div>
-                ))}
-                
-                {/* Visual empty slots for premium feel */}
-                {Array.from({ length: Math.max(0, 5 - displayItems.length) }).map((_, i) => (
-                    <div key={`empty-${i}`} className="inventory-slot empty" />
-                ))}
+                    );
+                })}
             </div>
 
             {/* Turbo Stack Indicator */}
@@ -75,48 +81,73 @@ export const Inventory: React.FC = () => {
                     display: flex;
                     gap: 12px;
                     background: rgba(15, 15, 15, 0.7);
-                    backdrop-filter: blur(15px);
-                    padding: 10px;
-                    border-radius: 14px;
-                    border: 1px solid rgba(255, 255, 255, 0.1);
-                    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6);
+                    backdrop-filter: blur(25px);
+                    padding: 12px;
+                    border-radius: 18px;
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 
+                                inset 0 0 20px rgba(255, 255, 255, 0.02);
                 }
 
                 .inventory-slot {
-                    width: 50px;
-                    height: 50px;
-                    background: rgba(255, 255, 255, 0.03);
-                    border: 2px solid rgba(255, 255, 255, 0.05);
-                    border-radius: 10px;
+                    width: 54px;
+                    height: 54px;
+                    background: rgba(255, 255, 255, 0.02);
+                    border: 1px solid rgba(255, 255, 255, 0.05);
+                    border-radius: 12px;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
                     position: relative;
                 }
 
                 .inventory-slot.empty {
-                   opacity: 0.3;
+                   opacity: 0.2;
+                }
+
+                .inventory-slot.selected {
+                    background: rgba(255, 255, 255, 0.08);
+                    border-color: rgba(255, 255, 255, 0.4);
+                    box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+                    transform: scale(1.1) translateY(-5px);
+                }
+
+                .inventory-slot.bomb.selected {
+                    border-color: #ff4400;
+                    box-shadow: 0 0 25px rgba(255, 68, 0, 0.3);
+                }
+
+                .inventory-slot.magnet.selected {
+                    border-color: #ff00ff;
+                    box-shadow: 0 0 25px rgba(255, 0, 255, 0.3);
+                }
+
+                .selection-indicator {
+                    position: absolute;
+                    top: -22px;
+                    font-size: 8px;
+                    font-weight: 800;
+                    color: white;
+                    white-space: nowrap;
+                    background: rgba(0, 0, 0, 0.6);
+                    padding: 2px 6px;
+                    border-radius: 4px;
+                    letter-spacing: 1px;
                 }
 
                 .inventory-slot:not(.empty) {
-                    background: rgba(0, 255, 255, 0.05);
-                    border-color: rgba(0, 255, 255, 0.2);
-                    animation: slotPop 0.4s ease-out;
-                }
-
-                .inventory-slot.hook {
-                    border-color: rgba(50, 50, 255, 0.4);
-                    background: rgba(50, 50, 255, 0.1);
+                    animation: slotPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
                 }
 
                 @keyframes slotPop {
-                    0% { transform: scale(0.5); opacity: 0; }
+                    0% { transform: scale(0.6); opacity: 0; }
                     100% { transform: scale(1); opacity: 1; }
                 }
 
                 .item-icon {
-                    font-size: 1.5rem;
+                    font-size: 1.8rem;
+                    filter: drop-shadow(0 0 8px rgba(255,255,255,0.2));
                 }
 
                 .turbo-wrap {

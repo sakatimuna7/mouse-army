@@ -274,7 +274,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
             // Show feedback that inventory is full
             return;
         }
-        if (itemType === 'bomb') {
+        if (itemType === 'bomb' || itemType === 'magnet') {
             this.inventory.push(itemType);
             this.syncInventoryToStore();
         } else if (itemType === 'hook') {

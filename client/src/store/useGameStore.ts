@@ -23,12 +23,14 @@ interface IGameStore {
     killLogs: IKillLog[];
     turboCount: number;
     hookCount: number;
+    selectedInventoryIndex: number;
     setLeaderboard: (data: ILeaderboardEntry[]) => void;
     setInventory: (items: string[]) => void;
     setPlayerName: (name: string) => void;
     setJoined: (status: boolean) => void;
     setTurboCount: (count: number) => void;
     setHookCount: (count: number) => void;
+    setInventoryIndex: (index: number) => void;
     addKillLog: (log: Omit<IKillLog, 'id'>) => void;
 }
 
@@ -50,8 +52,13 @@ export const useGameStore = create<IGameStore>((set) => ({
     killLogs: [],
     turboCount: 0,
     hookCount: 0,
+    selectedInventoryIndex: 0,
     setLeaderboard: (data) => set({ leaderboard: data }),
-    setInventory: (items) => set({ inventory: items }),
+    setInventory: (items) => set((state) => {
+        // Clamp index if inventory shrinks
+        const newIndex = Math.min(state.selectedInventoryIndex, Math.max(0, items.length - 1));
+        return { inventory: items, selectedInventoryIndex: newIndex };
+    }),
     setPlayerName: (name) => {
         localStorage.setItem('mouse_army_player_name', name);
         set({ playerName: name });
@@ -62,6 +69,7 @@ export const useGameStore = create<IGameStore>((set) => ({
     },
     setTurboCount: (count) => set({ turboCount: count }),
     setHookCount: (count) => set({ hookCount: count }),
+    setInventoryIndex: (index) => set({ selectedInventoryIndex: index }),
     addKillLog: (log) => set((state) => ({ 
         killLogs: [...state.killLogs, { ...log, id: Math.random().toString(36).substring(7) }].slice(-5) 
     })),

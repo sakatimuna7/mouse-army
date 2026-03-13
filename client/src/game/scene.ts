@@ -143,9 +143,10 @@ export class MainScene extends Phaser.Scene {
 
     // B. Item Textures (Bomb, Speed, Hook) matching Inventory UI
     const itemConfig = [
-      { key: "bomb", emoji: "💣", color: 0xff4444 },
+      { key: "bomb", emoji: "💣", color: 0xff4400 },
       { key: "speed", emoji: "⚡", color: 0xffff00 },
-      { key: "hook", emoji: "🪝", color: 0x4444ff },
+      { key: "hook", emoji: "🪝", color: 0x8888ff },
+      { key: "magnet", emoji: "🧲", color: 0xff00ff },
     ];
 
     itemConfig.forEach(cfg => {
@@ -250,11 +251,35 @@ export class MainScene extends Phaser.Scene {
       if (
         this.player &&
         this.player.visible &&
-        !this.player.isStunned &&
-        this.player.hasItem("bomb")
+        !this.player.isStunned
       ) {
-        this.throwBomb();
+        const { inventory, selectedInventoryIndex } = useGameStore.getState();
+        const selectedItem = inventory[selectedInventoryIndex];
+        
+        if (selectedItem === "bomb") {
+            this.throwBomb();
+        } else if (selectedItem === "magnet") {
+            this.useMagnet();
+        }
       }
+    });
+
+    const aKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.A);
+    aKey?.on("down", () => {
+        const { inventory, selectedInventoryIndex, setInventoryIndex } = useGameStore.getState();
+        if (inventory.length > 0) {
+            const nextIndex = (selectedInventoryIndex - 1 + inventory.length) % inventory.length;
+            setInventoryIndex(nextIndex);
+        }
+    });
+
+    const dKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.D);
+    dKey?.on("down", () => {
+        const { inventory, selectedInventoryIndex, setInventoryIndex } = useGameStore.getState();
+        if (inventory.length > 0) {
+            const nextIndex = (selectedInventoryIndex + 1) % inventory.length;
+            setInventoryIndex(nextIndex);
+        }
     });
 
     const eKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.E);
@@ -335,6 +360,22 @@ export class MainScene extends Phaser.Scene {
         itemSprite.destroy();
         this.items.delete(itemId);
       }
+    });
+
+    this.networkManager.on("magnetActivated", (data: { attractorId: string, x: number, y: number, radius: number }) => {
+        this.showMagnetEffect(data.x, data.y, data.radius);
+    });
+
+    this.networkManager.on("playerPushed", (data: { forceX: number, forceY: number }) => {
+        if (this.player && this.player.visible) {
+            this.tweens.add({
+                targets: this.player,
+                x: this.player.x + data.forceX,
+                y: this.player.y + data.forceY,
+                duration: 200,
+                ease: "Cubic.out"
+            });
+        }
     });
 
     this.networkManager.on("itemAddedToInventory", (type: string) => {
@@ -595,6 +636,50 @@ export class MainScene extends Phaser.Scene {
         });
         console.log(`Sending playerHooked for victim: ${(targetPlayer as Player).playerId}`);
       }
+  }
+
+  private useMagnet() {
+    if (!this.player || !this.player.visible || this.player.isStunned) return;
+
+    this.networkManager.emit("useMagnet", {
+        x: this.player.x,
+        y: this.player.y
+    });
+    
+    // Optimistic UI update: remove from local inventory
+    const { inventory, selectedInventoryIndex } = useGameStore.getState();
+    const newInventory = [...inventory];
+    newInventory.splice(selectedInventoryIndex, 1);
+    this.player.inventory = newInventory;
+    useGameStore.getState().setInventory(newInventory);
+    
+    this.showFloatingText(this.player.x, this.player.y - 40, "MAGNET ACTIVATED!", 0xff00ff);
+  }
+
+  private showMagnetEffect(x: number, y: number, radius: number) {
+      const circle = this.add.circle(x, y, 10, 0xff00ff, 0.4);
+      circle.setDepth(5);
+      
+      this.tweens.add({
+          targets: circle,
+          radius: radius,
+          alpha: 0,
+          duration: 600,
+          ease: "Cubic.out",
+          onComplete: () => circle.destroy()
+      });
+
+      // Particle burst
+      const particles = this.add.particles(x, y, "magnet", {
+          scale: { start: 0.2, end: 0 },
+          alpha: { start: 1, end: 0 },
+          speed: { min: 100, max: 300 },
+          lifespan: 400,
+          blendMode: "ADD",
+          maxParticles: 20
+      });
+      particles.setDepth(5);
+      this.time.delayedCall(400, () => particles.destroy());
   }
 
   handleExplosionDamage(
