@@ -584,6 +584,7 @@ export class MainScene extends Phaser.Scene {
     });
       setHookCount(0);
       this.player.setAimingHook(false);
+      this.networkManager.emit("useHook", {});
 
       if (targetPlayer) {
         this.networkManager.emit("playerHooked", {
@@ -801,6 +802,7 @@ export class MainScene extends Phaser.Scene {
       this.lastTurboTime = now;
       setTurboCount(turboCount - 1);
       this.player.activateSpeedBoost(this.TURBO_DURATION);
+      this.networkManager.emit("useTurbo", {});
 
       this.showFloatingText(
         this.player.x,

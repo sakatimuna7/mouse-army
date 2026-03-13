@@ -38,29 +38,31 @@ export class RoomManager {
 
   public handleDisconnect(socketId: string) {
     const roomId = this.socketToRoom.get(socketId);
-    if (roomId) {
-      const room = this.rooms.get(roomId);
-      if (room) {
-        // Just inform the engine that this socket is gone
-        room.engine.handleSocketDisconnect(socketId);
+    if (!roomId) return;
+
+    const room = this.rooms.get(roomId);
+    if (room) {
+      // 1. Notify engine
+      room.engine.handleSocketDisconnect(socketId);
+      
+      // 2. Shut down the room if no more human players are active
+      if (!room.engine.hasActiveHumans()) {
+        console.log(`Shutting down empty room: ${roomId}`);
+        room.engine.stop();
+        this.rooms.delete(roomId);
         
-        // Shut down the room if no more human players are active
-        if (!room.engine.hasActiveHumans()) {
-          room.engine.stop();
-          this.rooms.delete(roomId);
-          console.log(`Shut down empty room: ${roomId}`);
-          
-          // Clean up all character mappings associated with this room
-          for (const [sId, rId] of this.socketToRoom.entries()) {
-            if (rId === roomId) this.socketToRoom.delete(sId);
-          }
-          for (const [pId, rId] of this.persistentToRoom.entries()) {
-            if (rId === roomId) this.persistentToRoom.delete(pId);
-          }
+        // Exhaustive cleanup of all mappings for this room
+        for (const [sId, rId] of Array.from(this.socketToRoom.entries())) {
+          if (rId === roomId) this.socketToRoom.delete(sId);
+        }
+        for (const [pId, rId] of Array.from(this.persistentToRoom.entries())) {
+          if (rId === roomId) this.persistentToRoom.delete(pId);
         }
       }
-      this.socketToRoom.delete(socketId);
     }
+    
+    // Explicitly delete the disconnected socket mapping if it still exists
+    this.socketToRoom.delete(socketId);
   }
 
   public handlePlayerDeath(persistentId: string) {

@@ -17,7 +17,9 @@ interface IPlayerData extends IQuadEntity {
   isBot?: boolean;
   botType?: "Hunter" | "Scavenger" | "Wanderer";
   targetId?: string;
-  inventory?: string[];
+  inventory: string[];
+  turboCount: number;
+  hookCount: number;
   lastActionTime?: number;
 }
 
@@ -164,7 +166,11 @@ export class GameEngine {
   }
 
   public hasActiveHumans(): boolean {
-    return Object.values(this.players).some(p => !p.isBot && !this.io.sockets.sockets.get(p.userId)?.disconnected);
+    return Object.values(this.players).some(p => {
+      if (p.isBot) return false;
+      const socket = this.io.sockets.sockets.get(p.userId);
+      return socket !== undefined && socket.connected;
+    });
   }
 
   public getPlayerByPersistentId(persistentId: string) {
@@ -196,7 +202,10 @@ export class GameEngine {
         score: 0,
         isDead: false,
         isStunned: false,
-        spawnTime: Date.now()
+        spawnTime: Date.now(),
+        inventory: [],
+        turboCount: 0,
+        hookCount: 0
       };
       this.players[socketId] = newPlayer;
     }
@@ -291,11 +300,17 @@ export class GameEngine {
   }
 
   handleBomb(socketId: string, bombData: any) {
-    this.io.to(this.roomId).emit("bombSpawned", {
-      bombId: uuidv4(),
-      ownerId: socketId,
-      ...bombData
-    });
+    const player = this.players[socketId];
+    if (player && player.inventory.includes("bomb")) {
+      const index = player.inventory.indexOf("bomb");
+      player.inventory.splice(index, 1);
+      
+      this.io.to(this.roomId).emit("bombSpawned", {
+        bombId: uuidv4(),
+        ownerId: socketId,
+        ...bombData
+      });
+    }
   }
 
   handleHooked(socketId: string, data: { victimId: string, x: number, y: number }) {
@@ -345,6 +360,36 @@ export class GameEngine {
         this.broadcastLeaderboard();
       }
 
+      // DROP LOGIC
+      const dropItems: ("bomb" | "speed" | "hook")[] = [];
+      // 1. Drop bombs
+      victim.inventory.forEach(type => {
+        if (type === "bomb") dropItems.push("bomb");
+      });
+      // 2. Drop turbos
+      for (let i = 0; i < victim.turboCount; i++) dropItems.push("speed");
+      // 3. Drop hook
+      if (victim.hookCount > 0) dropItems.push("hook");
+
+      // Spawn dropped items
+      dropItems.forEach(type => {
+        const newItem: IItemData = {
+          id: uuidv4(),
+          itemId: "",
+          type: type,
+          x: victim.x + (Math.random() * 40 - 20),
+          y: victim.y + (Math.random() * 40 - 20)
+        };
+        newItem.itemId = newItem.id;
+        this.items[newItem.id] = newItem;
+        this.io.to(this.roomId).emit("itemSpawned", newItem);
+      });
+
+      // Clear victim inventory
+      victim.inventory = [];
+      victim.turboCount = 0;
+      victim.hookCount = 0;
+
       setTimeout(() => {
         if (this.players[data.victimId]) {
           victim.isDead = false;
@@ -370,15 +415,55 @@ export class GameEngine {
   }
 
   handlePickup(socketId: string, itemId: string) {
+    const player = this.players[socketId];
+    if (!player || player.isDead) return;
+
     const item = this.items[itemId];
     if (item) {
       const itemType = item.type;
-      delete this.items[itemId];
-      this.io.to(this.roomId).emit("itemDestroyed", itemId);
-      const socket = this.io.sockets.sockets.get(socketId);
-      if (socket) {
-        socket.emit("itemAddedToInventory", itemType);
+      let canPickup = false;
+
+      if (itemType === "speed") {
+        if (player.turboCount < 3) {
+          player.turboCount++;
+          canPickup = true;
+        }
+      } else if (itemType === "hook") {
+        if (player.hookCount < 1) {
+          player.hookCount++;
+          canPickup = true;
+        }
+      } else if (itemType === "bomb") {
+        if (player.inventory.length < 5) {
+          player.inventory.push("bomb");
+          canPickup = true;
+        }
       }
+
+      if (canPickup) {
+        delete this.items[itemId];
+        this.io.to(this.roomId).emit("itemDestroyed", itemId);
+        const socket = this.io.sockets.sockets.get(socketId);
+        if (socket) {
+          socket.emit("itemAddedToInventory", itemType);
+        }
+      }
+    }
+  }
+
+  handleUseTurbo(socketId: string) {
+    const player = this.players[socketId];
+    if (player && player.turboCount > 0) {
+      player.turboCount--;
+      console.log(`Player ${player.userName} used Turbo. Remaining: ${player.turboCount}`);
+    }
+  }
+
+  handleUseHook(socketId: string) {
+    const player = this.players[socketId];
+    if (player && player.hookCount > 0) {
+      player.hookCount--;
+      console.log(`Player ${player.userName} used Hook. Remaining: ${player.hookCount}`);
     }
   }
 
@@ -411,9 +496,12 @@ export class GameEngine {
       isStunned: false,
       spawnTime: Date.now(),
       isBot: true,
-      botType: botType,
+      botType: botType as any,
       inventory: [],
-      lastActionTime: 0
+      turboCount: 0,
+      hookCount: 0,
+      lastActionTime: 0,
+      targetId: undefined
     };
 
     this.players[botId] = newBot;

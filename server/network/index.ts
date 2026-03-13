@@ -54,6 +54,14 @@ io.on("connection", (socket) => {
     socket.on("pickupItem", (itemId: string) => {
       room.engine.handlePickup(socket.id, itemId);
     });
+
+    socket.on("useTurbo", () => {
+      room.engine.handleUseTurbo(socket.id);
+    });
+
+    socket.on("useHook", () => {
+      room.engine.handleUseHook(socket.id);
+    });
   });
 
   socket.on("disconnect", () => {
