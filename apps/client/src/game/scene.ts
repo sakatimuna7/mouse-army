@@ -536,7 +536,7 @@ export class MainScene extends Phaser.Scene {
         let other = this.otherPlayers.get(id);
         if (!other) {
           // Spawn if not exists
-          other = new Player(this, id, info.x, info.y, "player_atlas", info.userName, this.worldLayer);
+          other = new Player(this, id, info.x, info.y, "mouse_azure", info.userName, this.worldLayer);
           this.otherPlayers.set(id, other);
         }
 
@@ -544,6 +544,7 @@ export class MainScene extends Phaser.Scene {
         other.health = info.health;
         other.isBot = !!info.isBot;
         other.isDead = !!info.isDead;
+        other.lastUpdate = Date.now();
 
         if (other.isDead) {
             other.setVisible(false);
@@ -552,17 +553,18 @@ export class MainScene extends Phaser.Scene {
             if (other.isBot) {
                 other.setTint(0xcccccc);
             } else {
-                other.clearTint(); // Clear tint if not a bot
+                other.clearTint();
             }
         }
         
-        // Simple interpolation
+        // Robust interpolation
         this.tweens.add({
           targets: other,
           x: info.x,
           y: info.y,
-          duration: 50, // Match server tick rate (20Hz = 50ms)
-          ease: "Linear",
+          rotation: info.rotation || 0,
+          duration: 100, // Bridging 2 packets (50ms x 2) for smoother jitter handling
+          ease: "Power1", // Smoother than linear for jitter
           overwrite: true
         });
       });
@@ -1264,9 +1266,15 @@ export class MainScene extends Phaser.Scene {
       }
     }
     
-    // Sync UI for all other players (important for bots and those moved by tweens)
-    this.otherPlayers.forEach(other => {
-        other.syncUI();
+    // Sync UI for all other players and Handle AOI Cleanup
+    const now = Date.now();
+    this.otherPlayers.forEach((other, id) => {
+        if (now - other.lastUpdate > 1000) { // If no update for 1s, they are out of range
+            other.destroy();
+            this.otherPlayers.delete(id);
+        } else {
+            other.syncUI();
+        }
     });
 
     this.updateMinimap();

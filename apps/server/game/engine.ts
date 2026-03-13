@@ -193,6 +193,7 @@ export class GameEngine {
         persistentId: persistentId,
         x: Math.random() * (this.WORLD_SIZE - 100) + 50,
         y: Math.random() * (this.WORLD_SIZE - 100) + 50,
+        rotation: 0,
         health: 100,
         score: 0,
         isDead: false,
@@ -236,6 +237,7 @@ export class GameEngine {
     if (player && !player.isDead && !player.isStunned) {
       player.x = movementData.x;
       player.y = movementData.y;
+      player.rotation = movementData.rotation || 0;
       player.health = movementData.health;
       // We don't broadcast immediately anymore, wait for tick
     }
@@ -532,6 +534,7 @@ export class GameEngine {
       persistentId: `bot-persistent-${botId}`,
       x: Math.random() * (this.WORLD_SIZE - 200) + 100,
       y: Math.random() * (this.WORLD_SIZE - 200) + 100,
+      rotation: 0,
       health: 100,
       score: 0,
       isDead: false,

@@ -25,6 +25,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     
     // Score
     public score: number = 0;
+    public lastUpdate: number = Date.now();
 
     // Knockback properties
     private knockbackForce: Phaser.Math.Vector2 = new Phaser.Math.Vector2(0, 0);
@@ -316,6 +317,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
             id: this.playerId,
             x: this.x,
             y: this.y,
+            rotation: this.rotation,
             health: this.health,
             score: this.score,
             isStunned: this.isStunned,

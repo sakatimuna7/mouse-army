@@ -18,6 +18,7 @@ export interface IPlayerData {
     userName: string;
     x: number;
     y: number;
+    rotation: number;
     health: number;
     score: number;
     isDead: boolean;
