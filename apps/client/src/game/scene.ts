@@ -3,6 +3,7 @@ import { Player } from "./player";
 import { NetworkManager } from "../network/networkManager";
 import { IPlayerData, IItemData } from "@mouse-army/shared";
 import { useGameStore } from "../store/useGameStore";
+import { soundSynth } from "./audioSynth";
 
 interface IBombData {
   bombId: string;
@@ -71,8 +72,26 @@ export class MainScene extends Phaser.Scene {
   }
 
   preload() {
-    // 1. Particle assets (remote is fine for sparks)
+    // 1. Particle assets
     this.load.image("spark", "https://labs.phaser.io/assets/particles/muzzleflash2.png");
+  }
+
+  private playSound(key: string, _volume: number = 0.5) {
+      if (useGameStore.getState().isMuted) return;
+      
+      switch(key) {
+          case "sfx_click": soundSynth.playClick(); break;
+          case "sfx_slash": soundSynth.playSlash(); break;
+          case "sfx_explosion": soundSynth.playExplosion(); break;
+          case "sfx_pickup": soundSynth.playPickup(); break;
+          case "sfx_dash": soundSynth.playDash(); break;
+          case "sfx_hook": soundSynth.playHook(); break;
+          case "sfx_alert": soundSynth.playAlert(); break;
+          case "sfx_magnet": soundSynth.playMagnet(); break;
+          case "sfx_vortex": soundSynth.playVortex(); break;
+          case "sfx_spin": soundSynth.playSpin(); break;
+          case "sfx_rocket": soundSynth.playRocket(this.TURBO_DURATION / 1000); break;
+      }
   }
 
   create() {
@@ -455,6 +474,7 @@ export class MainScene extends Phaser.Scene {
 
     this.networkManager.on("magnetActivated", (data: { attractorId: string, x: number, y: number, radius: number }) => {
         this.showMagnetEffect(data.x, data.y, data.radius);
+        this.playSound("sfx_magnet", 0.6);
     });
 
     this.networkManager.on("playerPushed", (data: { forceX: number, forceY: number }) => {
@@ -466,6 +486,13 @@ export class MainScene extends Phaser.Scene {
             if (this.player.isSpeedBoostActive()) {
                 fx *= 0.5;
                 fy *= 0.5;
+                if (Math.random() < 0.1) this.playSound("sfx_dash", 0.05); // Tiny sound for resistance
+            } else {
+                // If force is strong (Black Hole), play spinning sound
+                const magnitude = Math.sqrt(fx*fx + fy*fy);
+                if (magnitude > 10) {
+                    this.playSound("sfx_spin", 0.3);
+                }
             }
 
             this.tweens.add({
@@ -490,6 +517,7 @@ export class MainScene extends Phaser.Scene {
                 "+1 TURBO CHARGE",
                 0xffff00,
             );
+            this.playSound("sfx_pickup", 0.5);
           } else {
              this.showFloatingText(
                 this.player.x,
@@ -497,6 +525,7 @@ export class MainScene extends Phaser.Scene {
                 "TURBO FULL!",
                 0xffaa00,
             );
+            this.playSound("sfx_click", 0.3);
           }
         } else if (type === "hook") {
              const { hookCount, setHookCount } = useGameStore.getState();
@@ -508,6 +537,7 @@ export class MainScene extends Phaser.Scene {
                     "HOOK ACQUIRED",
                     0x8888ff,
                 );
+                this.playSound("sfx_pickup", 0.5);
              }
         } else {
           this.player.addToInventory(type);
@@ -517,6 +547,7 @@ export class MainScene extends Phaser.Scene {
             `+ ${type.toUpperCase()}`,
             0x00ffff,
           );
+          this.playSound("sfx_pickup", 0.5);
         }
       }
     });
@@ -596,6 +627,7 @@ export class MainScene extends Phaser.Scene {
           data.attackerId,
           false // canHitOwner = false (Basic attack doesn't hit self)
         );
+        this.playSound("sfx_slash", 0.4);
       },
     );
 
@@ -626,6 +658,7 @@ export class MainScene extends Phaser.Scene {
             duration: 800,
             onComplete: () => line.destroy(),
           });
+          this.playSound("sfx_hook", 0.6);
 
           victim.setStun(true);
           this.time.delayedCall(this.STUN_DURATION, () =>
@@ -689,14 +722,17 @@ export class MainScene extends Phaser.Scene {
 
     this.networkManager.on("blackHoleWarning", (data: { x: number, y: number }) => {
         this.handleBlackHoleWarning(data.x, data.y);
+        this.playSound("sfx_alert", 0.5);
     });
 
     this.networkManager.on("blackHoleSpawned", (data: { x: number, y: number }) => {
         this.handleBlackHoleSpawned(data.x, data.y);
+        this.playSound("sfx_vortex", 0.7);
     });
 
     this.networkManager.on("blackHoleCollapsed", (data: { x: number, y: number }) => {
         this.handleBlackHoleCollapsed(data.x, data.y);
+        this.playSound("sfx_explosion", 0.8);
     });
   }
 
@@ -1005,6 +1041,7 @@ export class MainScene extends Phaser.Scene {
     this.explosionEmitter.emitParticleAt(x, y);
     this.showAttackEffect(x, y, radius, 0xffa500);
     this.cameras.main.shake(250, 0.015);
+    this.playSound("sfx_explosion", 0.8);
   }
 
   private handleLocalDeath() {
@@ -1086,6 +1123,7 @@ export class MainScene extends Phaser.Scene {
       radius: this.ATTACK_RADIUS,
       force: this.ATTACK_FORCE,
     });
+    this.playSound("sfx_slash", 0.4);
 
     // LOCAL PREDICTION: Immediately check for hits (especially for bots)
     this.handleExplosionDamage(
@@ -1132,6 +1170,7 @@ export class MainScene extends Phaser.Scene {
         "SPEED BOOST!",
         0xffff00,
       );
+      this.playSound("sfx_rocket", 0.8);
     } else if (turboCount > 0) {
         const remainingCd = Math.ceil((totalCycle - (now - this.lastTurboTime)) / 1000);
         this.showFloatingText(
@@ -1263,6 +1302,7 @@ export class MainScene extends Phaser.Scene {
           setHookCount(0);
           this.player.setAimingHook(false);
           this.showFloatingText(this.player.x, this.player.y - 40, "HOOK FAILED!", 0xff4444);
+          this.playSound("sfx_click", 0.3);
       }
     }
     

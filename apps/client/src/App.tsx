@@ -5,6 +5,7 @@ import { Inventory } from "./components/parts/inventory/Inventory";
 import { Lobby } from "./components/parts/lobby/Lobby";
 import { KillFeed } from "./components/parts/kill-feed/KillFeed";
 import { useGameStore } from './store/useGameStore';
+import { soundSynth } from './game/audioSynth';
 
 function App() {
   const gameRef = useRef<Phaser.Game | null>(null);
@@ -113,7 +114,10 @@ function App() {
       <div className={`hud-settings ${isMenuOpen ? 'open' : ''}`}>
         <button 
             className="settings-toggle"
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
+            onClick={() => {
+                setIsMenuOpen(!isMenuOpen);
+                soundSynth.playClick();
+            }}
         >
             <div className="toggle-icon">{isMenuOpen ? '✕' : '⚙'}</div>
         </button>
@@ -122,7 +126,10 @@ function App() {
           <div className="settings-menu">
             <button 
                 className="action-btn exit"
-                onClick={() => useGameStore.getState().setJoined(false)}
+                onClick={() => {
+                    useGameStore.getState().setJoined(false);
+                    soundSynth.playClick();
+                }}
             >
                 <div className="btn-icon">↩</div>
                 <span>LEAVE</span>
@@ -130,10 +137,24 @@ function App() {
 
             <button 
                 className="action-btn fullscreen"
-                onClick={toggleFullScreen}
+                onClick={() => {
+                   toggleFullScreen();
+                   soundSynth.playClick();
+                }}
             >
                 <div className="btn-icon">⛶</div>
                 <span>SCREEN</span>
+            </button>
+
+            <button 
+                className={`action-btn ${useGameStore.getState().isMuted ? 'muted' : ''}`}
+                onClick={() => {
+                    useGameStore.getState().toggleMute();
+                    soundSynth.playClick();
+                }}
+            >
+                <div className="btn-icon">{useGameStore.getState().isMuted ? '🔇' : '🔊'}</div>
+                <span>{useGameStore.getState().isMuted ? 'UNMUTE' : 'MUTE'}</span>
             </button>
           </div>
         )}

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useGameStore } from '../../../store/useGameStore';
+import { soundSynth } from '../../../game/audioSynth';
 import { Users, Shield, Zap, Sword } from 'lucide-react';
 
 export const Lobby: React.FC = () => {
@@ -11,6 +12,7 @@ export const Lobby: React.FC = () => {
         e.preventDefault();
         if (!name.trim()) return;
 
+        soundSynth.playClick();
         setIsLoading(true);
         // Simulate a slight delay for "premium" feel
         setTimeout(() => {

@@ -12,6 +12,7 @@ interface IGameStore {
     hookCount: number;
     selectedInventoryIndex: number;
     blackHoleMessage: string;
+    isMuted: boolean;
     setLeaderboard: (data: ILeaderboardEntry[]) => void;
     setInventory: (items: string[]) => void;
     setPlayerName: (name: string) => void;
@@ -20,6 +21,7 @@ interface IGameStore {
     setHookCount: (count: number) => void;
     setInventoryIndex: (index: number) => void;
     setBlackHoleMessage: (message: string) => void;
+    toggleMute: () => void;
     addKillLog: (log: Omit<IKillLog, 'id'>) => void;
 }
 
@@ -43,6 +45,7 @@ export const useGameStore = create<IGameStore>((set) => ({
     hookCount: 0,
     selectedInventoryIndex: 0,
     blackHoleMessage: "",
+    isMuted: localStorage.getItem('mouse_army_is_muted') === 'true',
     setLeaderboard: (data) => set({ leaderboard: data }),
     setInventory: (items) => set((state) => {
         // Clamp index if inventory shrinks
@@ -61,6 +64,11 @@ export const useGameStore = create<IGameStore>((set) => ({
     setHookCount: (count) => set({ hookCount: count }),
     setInventoryIndex: (index) => set({ selectedInventoryIndex: index }),
     setBlackHoleMessage: (message) => set({ blackHoleMessage: message }),
+    toggleMute: () => set((state) => {
+        const nextMuted = !state.isMuted;
+        localStorage.setItem('mouse_army_is_muted', nextMuted ? 'true' : 'false');
+        return { isMuted: nextMuted };
+    }),
     addKillLog: (log) => set((state) => ({ 
         killLogs: [...state.killLogs, { ...log, id: Math.random().toString(36).substring(7) }].slice(-5) 
     })),
