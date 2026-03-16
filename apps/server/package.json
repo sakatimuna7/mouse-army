@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "bun --watch network/index.ts",
     "build": "tsc",
+    "start": "node dist/network/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
