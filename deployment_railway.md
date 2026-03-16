@@ -12,6 +12,7 @@ In a monorepo, Node.js often fails to resolve `.ts` files from shared packages w
 I've updated the `railway.json` in your root directory. It now uses standard Node.js:
 - **Build Command**: `npm install && npx turbo build --filter=server`
 - **Start Command**: `node apps/server/dist/network/index.js` (Note: the path is now cleaner!)
+- **Health Check**: Endpoint `/health` is now available for deployment monitoring.
 I've created a `railway.json` file in your root directory. This file is the **Source of Truth** for Railway and will override any manual dashboard settings, making the deployment "Plug and Play."
 
 **What's in the file:**

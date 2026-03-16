@@ -14,6 +14,11 @@ app.use(cors({
   origin: ALLOWED_ORIGIN
 }));
 
+// Health check endpoint for deployment
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
