@@ -206,7 +206,7 @@ export class MainScene extends Phaser.Scene {
       this.networkManager.off("itemDestroyed");
       this.networkManager.off("itemAddedToInventory");
       this.networkManager.off("bombSpawned");
-      this.networkManager.off("playerMoved");
+      this.networkManager.off("gameUpdate");
       this.networkManager.off("playerAttack");
       this.networkManager.off("playerHookedEffect");
       this.networkManager.off("playerDeath");
@@ -216,6 +216,8 @@ export class MainScene extends Phaser.Scene {
       this.networkManager.off("blackHoleWarning");
       this.networkManager.off("blackHoleSpawned");
       this.networkManager.off("blackHoleCollapsed");
+      this.networkManager.off("magnetActivated");
+      this.networkManager.off("playerPushed");
     });
   }
 
