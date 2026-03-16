@@ -3,9 +3,12 @@
 Follow these steps to fix the `MODULE_NOT_FOUND` error and deploy successfully to Railway.
 
 ## 1. Why it failed
-In a monorepo, TypeScript often creates a nested `dist/apps/server/...` structure instead of putting everything directly in `dist/`. I've updated your `tsconfig.json` to make this structure **predictable**.
+In a monorepo, Node.js (ERM) often fails to resolve `.ts` files from shared packages when running compiled code. I've switched the runtime from **Node.js** to **Bun**. 
+
+**Bun** is perfect for this because it natively understands TypeScript and handles monorepo workspace mappings (`@mouse-army/shared`) without any extra configuration or loaders.
 
 ## 2. Updated Configuration (`railway.json`)
+I've updated the `railway.json` in your root directory. It now tells Railway to use Bun for execution.
 I've created a `railway.json` file in your root directory. This file is the **Source of Truth** for Railway and will override any manual dashboard settings, making the deployment "Plug and Play."
 
 **What's in the file:**
