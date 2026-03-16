@@ -11,21 +11,20 @@ I have added the following to your `apps/client/package.json`:
 ```
 This forces `npm` to install the Linux-specific binary that Cloudflare needs, even if you are building from a Mac.
 
-## 2. Cloudflare Dashboard Settings
-**IMPORTANT**: You MUST configure these settings in your Cloudflare Pages project dashboard:
+## 2. Setting Wajib (Berdasarkan Screenshot Lu)
+Lu harus ganti settingan di dashboard Cloudflare biar bisa baca monorepo Turborepo ini:
 
-| Setting | Value |
-| :--- | :--- |
-| **Framework Preset** | `None` |
-| **Build command** | `npx turbo build --filter=client` |
-| **Build output directory** | `apps/client/dist` |
-| **Root directory** | `/` |
+| Setting | Nilai Sekarang (Salah) | **Nilai Yang Bener (Wajib)** |
+| :--- | :--- | :--- |
+| **Root directory** | `/apps/client` | **`/`** (Wajib dikosongin atau isi `/`) |
+| **Build command** | `npm run build` | **`npx turbo build --filter=client`** |
+| **Build output directory** | `dist` | **`apps/client/dist`** |
 
 > [!IMPORTANT]
-> Change the **Root directory** to `/` (the root of your project) so Cloudflare can see the `packages/shared` workspace and use `turbo`.
+> **Kenapa harus ganti Root Directory?** 
+> Karena project ini pake Monorepo. Kalo lu set ke `/apps/client`, Cloudflare gak bakal bisa liat file `package-lock.json` yang ada di root dan file shared package kita. Makanya dia error `npm ci`.
 
 ## 3. Environment Variables
-Add these in the Cloudflare dashboard:
-- `NODE_VERSION`: `22`
-- `NPM_VERSION`: `10`
-- `VITE_SERVER_URL`: `https://your-server-url.railway.app` (Your production server URL)
+Pastiin udah nambahin ini juga di Cloudflare:
+- `NODE_VERSION`: `22` (pastiin pake versi yang sama kayak lokal)
+- `VITE_SERVER_URL`: URL API lu di Railway (misal: `https://mouse-army-production.up.railway.app`)
