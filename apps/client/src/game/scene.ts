@@ -76,8 +76,12 @@ export class MainScene extends Phaser.Scene {
     this.load.image("spark", "https://labs.phaser.io/assets/particles/muzzleflash2.png");
   }
 
-  private playSound(key: string, _volume: number = 0.5) {
-      if (useGameStore.getState().isMuted) return;
+  private playSound(key: string, _volume: number = 0.5, duration: number = 0) {
+      const { isMuted } = useGameStore.getState();
+      if (isMuted) {
+          soundSynth.stopBGM();
+          return;
+      }
       
       switch(key) {
           case "sfx_click": soundSynth.playClick(); break;
@@ -91,6 +95,7 @@ export class MainScene extends Phaser.Scene {
           case "sfx_vortex": soundSynth.playVortex(); break;
           case "sfx_spin": soundSynth.playSpin(); break;
           case "sfx_rocket": soundSynth.playRocket(this.TURBO_DURATION / 1000); break;
+          case "sfx_rumble": soundSynth.playRumble(duration || 0.5, _volume); break;
       }
   }
 
@@ -99,6 +104,9 @@ export class MainScene extends Phaser.Scene {
     this.bombs = this.physics.add.group();
     this.hookRangeGraphics = this.add.graphics();
     this.hookRangeGraphics.setDepth(1);
+
+    // BGM
+    soundSynth.startBGM();
 
     // 1. Layer Setup (MUST BE FIRST)
     this.worldLayer = this.add.container(0, 0);
@@ -739,6 +747,7 @@ export class MainScene extends Phaser.Scene {
   private handleBlackHoleWarning(x: number, y: number) {
       useGameStore.getState().setBlackHoleMessage("⚠ GRAVITY ANOMALY DETECTED");
       this.cameras.main.shake(1000, 0.005);
+      this.playSound("sfx_rumble", 0.4, 1.0);
       
       if (this.blackHoleTelegraph) this.blackHoleTelegraph.destroy();
       
@@ -809,6 +818,7 @@ export class MainScene extends Phaser.Scene {
               spiral.clearTint();
               this.showFloatingText(x, y, "CORE COMPRESSION", 0xff0000);
               this.cameras.main.shake(200, 0.02);
+              this.playSound("sfx_rumble", 0.8, 0.2);
               
               // Slow down rotation slightly for 'heavy' feel
               this.tweens.add({
@@ -833,6 +843,7 @@ export class MainScene extends Phaser.Scene {
       });
 
       this.cameras.main.shake(3000, 0.01);
+      this.playSound("sfx_rumble", 0.3, 3.0);
   }
 
   private handleBlackHoleCollapsed(x: number, y: number) {
@@ -856,6 +867,7 @@ export class MainScene extends Phaser.Scene {
 
       this.createExplosion(x, y, 300);
       this.cameras.main.shake(500, 0.03);
+      this.playSound("sfx_rumble", 0.9, 0.5);
   }
 
   private useHook() {
@@ -1042,6 +1054,7 @@ export class MainScene extends Phaser.Scene {
     this.showAttackEffect(x, y, radius, 0xffa500);
     this.cameras.main.shake(250, 0.015);
     this.playSound("sfx_explosion", 0.8);
+    this.playSound("sfx_rumble", 0.5, 0.25);
   }
 
   private handleLocalDeath() {

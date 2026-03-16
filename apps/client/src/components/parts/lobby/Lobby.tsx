@@ -13,6 +13,7 @@ export const Lobby: React.FC = () => {
         if (!name.trim()) return;
 
         soundSynth.playClick();
+        soundSynth.startBGM();
         setIsLoading(true);
         // Simulate a slight delay for "premium" feel
         setTimeout(() => {
