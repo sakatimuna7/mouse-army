@@ -18,7 +18,7 @@ Use the following settings during the setup process:
 - **Region**: Choose the one closest to your players (e.g., Singapore for Asia).
 - **Branch**: `main`
 - **Root Directory**: Leave blank (we will run from the root of the monorepo).
-- **Build Command**: `npm install && npm run build`
+- **Build Command**: `npm install && npx turbo build --filter=server`
 - **Start Command**: `node apps/server/dist/network/index.js`
 
 ## 4. Set Environment Variables

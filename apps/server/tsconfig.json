@@ -7,6 +7,7 @@
     "skipLibCheck": true,
     "sourceMap": true,
     "outDir": "./dist",
+    "rootDir": "../../",
     "moduleDetection": "force",
     "strict": true,
     "noImplicitAny": true,
