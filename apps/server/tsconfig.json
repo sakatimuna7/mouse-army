@@ -7,7 +7,6 @@
     "skipLibCheck": true,
     "sourceMap": true,
     "outDir": "./dist",
-    "rootDir": "../../",
     "moduleDetection": "force",
     "strict": true,
     "noImplicitAny": true,
@@ -16,10 +15,7 @@
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
     "verbatimModuleSyntax": false,
-    "baseUrl": ".",
-    "paths": {
-      "@mouse-army/shared": ["../../packages/shared/index.ts"]
-    }
+    "baseUrl": "."
   },
   "include": ["**/*.ts"],
   "exclude": ["node_modules", "tests"]

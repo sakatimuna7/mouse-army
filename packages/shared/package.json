@@ -1,10 +1,16 @@
 {
   "name": "@mouse-army/shared",
   "version": "1.0.0",
-  "main": "index.ts",
-  "types": "index.ts",
-  "exports": {
-    ".": "./index.ts"
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
   },
-  "license": "ISC"
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "license": "ISC",
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
 }

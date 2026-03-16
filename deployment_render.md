@@ -21,6 +21,9 @@ Use the following settings during the setup process:
 - **Build Command**: `npm install && npx turbo build --filter=server`
 - **Start Command**: `node apps/server/dist/network/index.js`
 
+> [!NOTE]
+> We build the entire project (filtering for server) because the server depends on the `@mouse-army/shared` package being compiled to JavaScript.
+
 ## 4. Set Environment Variables
 Click on the **Advanced** button or go to the **Env Vars** tab after creation:
 
