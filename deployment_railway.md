@@ -5,14 +5,20 @@ Follow these steps to fix the `MODULE_NOT_FOUND` error and deploy successfully t
 ## 1. Why it failed
 In a monorepo, TypeScript often creates a nested `dist/apps/server/...` structure instead of putting everything directly in `dist/`. I've updated your `tsconfig.json` to make this structure **predictable**.
 
-## 2. Railway Settings
-Go to your service settings in [Railway](https://railway.app/) and update these fields:
+## 2. Updated Configuration (`railway.json`)
+I've created a `railway.json` file in your root directory. This file is the **Source of Truth** for Railway and will override any manual dashboard settings, making the deployment "Plug and Play."
 
-- **Root Directory**: `/` (Must be the root of the project)
+**What's in the file:**
 - **Build Command**: `npm install && npx turbo build --filter=server`
 - **Start Command**: `npm start -w server`
 
-## 3. Environment Variables
+## 3. Verify and Push
+1. **Push Changes**: Make sure you have committed and pushed the `railway.json` and the updated `apps/server/package.json` to your GitHub.
+2. **Dashboard**: In the Railway dashboard, go to your service → **Settings**. 
+   - Ensure the **Root Directory** is set to `/`.
+   - If there is a "Custom Start Command" manually typed in the dashboard, **DELETE IT** so it uses the one in `railway.json`.
+
+## 4. Environment Variables
 Make sure these are added in the **Variables** tab:
 
 | Variable | Value |
